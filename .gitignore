@@ -2,3 +2,10 @@
 
 package-lock.json
 node_modules/
+
+.claude
+.opencode
+plans/templates
+.repomixignore
+CLAUDE.md
+AGENTS.md
