@@ -1,0 +1,35 @@
+{
+  "name": "pg-query-composer",
+  "version": "0.1.0",
+  "description": "Advanced PostgreSQL query builder with dynamic composition, subqueries, and relations",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./composition": "./dist/composition/index.js",
+    "./subquery": "./dist/subquery/index.js",
+    "./relations": "./dist/relations/index.js",
+    "./pg": "./dist/pg/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts"
+  },
+  "peerDependencies": {
+    "zod": "^3.23.0"
+  },
+  "dependencies": {
+    "squel": "^5.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0",
+    "zod": "^3.23.0",
+    "dataloader": "^2.2.0"
+  },
+  "keywords": ["postgresql", "query-builder", "sql", "typescript"],
+  "license": "MIT"
+}
