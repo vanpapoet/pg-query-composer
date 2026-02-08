@@ -360,4 +360,4 @@ MIT - See LICENSE file
 
 ---
 
-**pg-query-composer** • [GitHub](https://github.com/yourusername/pg-query-composer) • [npm](https://www.npmjs.com/package/pg-query-composer)
+**pg-query-composer** • [GitHub](https://github.com/vanpapoet/pg-query-composer) • [npm](https://www.npmjs.com/package/pg-query-composer)

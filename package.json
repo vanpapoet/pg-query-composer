@@ -1,6 +1,6 @@
 {
   "name": "pg-query-composer",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Advanced PostgreSQL query builder with dynamic composition, subqueries, and relations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -30,6 +30,34 @@
     "zod": "^3.23.0",
     "dataloader": "^2.2.0"
   },
-  "keywords": ["postgresql", "query-builder", "sql", "typescript"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vanpapoet/pg-query-composer.git"
+  },
+  "homepage": "https://github.com/vanpapoet/pg-query-composer#readme",
+  "bugs": {
+    "url": "https://github.com/vanpapoet/pg-query-composer/issues"
+  },
+  "author": "vanpapoet",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "postgresql",
+    "query-builder",
+    "sql",
+    "typescript",
+    "where-clause",
+    "dynamic-query",
+    "node-postgres",
+    "pg",
+    "subquery",
+    "composition"
+  ],
   "license": "MIT"
 }
