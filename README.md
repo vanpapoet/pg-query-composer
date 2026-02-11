@@ -254,7 +254,7 @@ MIT - See LICENSE file
 
 ## Changelog
 
-### v0.1.0 (2026-02-07) - Initial Release
+### v1.0.1 (2026-02-11)
 
 - Core QueryComposer with 34 operators
 - Type-safe TypedQueryComposer wrapper
