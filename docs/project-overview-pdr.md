@@ -305,11 +305,45 @@ const loader = createRelationLoader({
 
 ## Getting Started
 
-1. **Install:** `npm install pg-query-composer zod`
-2. **Define Schema:** Create Zod schema representing DB table
-3. **Create Composer:** `createQueryComposer(schema, 'table_name')`
-4. **Build Query:** Chain methods for WHERE, ORDER BY, pagination
-5. **Execute:** `composer.build()` returns parameterized SQL + values
+### Installation
+
+```bash
+npm install pg-query-composer zod
+```
+
+### Basic Setup
+
+```typescript
+import { z } from 'zod';
+import { createQueryComposer } from 'pg-query-composer';
+
+// Step 1: Define Schema
+const userSchema = z.object({
+  id: z.number(),
+  email: z.string().email(),
+  name: z.string(),
+  status: z.string(),
+  created_at: z.string().datetime(),
+});
+
+// Step 2: Create Composer
+const composer = createQueryComposer(userSchema, 'users');
+
+// Step 3: Build Query
+const result = composer
+  .where('status__exact', 'active')
+  .where('email__contains', 'gmail.com')
+  .orderBy('-created_at')
+  .paginate({ page: 1, limit: 10 })
+  .toParam();
+
+// Step 4: Execute (example with pg library)
+const { text, values } = result;
+console.log('SQL:', text);
+// SELECT * FROM users WHERE status = $1 AND email LIKE $2 ORDER BY created_at DESC LIMIT 10 OFFSET 0
+console.log('Values:', values);
+// ['active', '%gmail.com%']
+```
 
 ## Success Metrics
 

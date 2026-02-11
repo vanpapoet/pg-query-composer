@@ -40,31 +40,32 @@ const userSchema = z.object({
   id: z.number(),
   email: z.string().email(),
   name: z.string(),
+  status: z.string(),
   created_at: z.string().datetime(),
 });
 
 // Create composer
 const composer = createQueryComposer(userSchema, 'users');
 
-// Build query
+// Build query with multiple conditions
 const result = composer
   .where('email__contains', 'example.com')
-  .where('created_at__gte', new Date('2024-01-01'))
-  .orderBy('created_at', 'DESC')
+  .where('status__exact', 'active')
+  .orderBy('-created_at') // Negative prefix = DESC
   .paginate({ page: 1, limit: 20 })
-  .build();
+  .toParam();
 
-console.log(result.sql);
-// SELECT * FROM users WHERE email LIKE $1 AND created_at >= $2 ORDER BY created_at DESC LIMIT 20 OFFSET 0
+console.log(result.text);
+// SELECT * FROM users WHERE email LIKE $1 AND status = $2 ORDER BY created_at DESC LIMIT 20 OFFSET 0
 
 console.log(result.values);
-// ['%example.com%', '2024-01-01T00:00:00Z']
+// ['%example.com%', 'active']
 ```
 
 ### Type-Safe Queries
 
 ```typescript
-import { createTypedComposer } from 'pg-query-composer';
+import { createTypedComposer } from 'pg-query-composer/types';
 
 const typed = createTypedComposer(userSchema, 'users');
 
@@ -73,6 +74,9 @@ typed.where('invalid_field__exact', 'value'); // ✗ TypeScript error
 
 // Type-safe: 'email' exists in schema
 typed.where('email__exact', 'test@example.com'); // ✓
+
+const { text, values } = typed.toParam();
+console.log('Safe query built with compile-time validation');
 ```
 
 ### Eager Loading with Relations
@@ -110,15 +114,20 @@ const users = await userQuery
 ### Reusable Filters
 
 ```typescript
-import { fragment, dateRange, scope } from 'pg-query-composer/composition';
+import { dateRange, contains, fragment } from 'pg-query-composer/composition';
+
+const composer = createQueryComposer(userSchema, 'users');
 
 // Pre-built fragments
-const f = dateRange('created_at', startDate, endDate);
-composer.where(...f);
+const startDate = new Date('2024-01-01');
+const endDate = new Date('2024-12-31');
+const dateFilter = dateRange('created_at', startDate, endDate);
+const nameFilter = contains('name', 'John');
 
-// Reusable scopes
-const activeScope = scope((q) => q.where('deleted_at__isnull', true));
-composer.applyScope(activeScope);
+composer.where(...dateFilter).where(...nameFilter);
+
+const { text, values } = composer.toParam();
+console.log('Filtered by date range and name');
 ```
 
 ### PostgreSQL Features
@@ -187,132 +196,31 @@ const ancestors = ancestorsCTE('categories', 'id', 'parent_id', 5);
 
 ## API Reference
 
-### Core Builder
+See full API docs in [`/docs`](docs/):
 
-```typescript
-createQueryComposer(schema, table, options?)
-  .where(column, value)
-  .andWhere(column, value)
-  .orWhere(column, value)
-  .notWhere(column, value)
-  .join(table, alias?, on)
-  .groupBy(...fields)
-  .having(condition)
-  .orderBy(field, direction)
-  .select(...fields) / .exclude(...fields)
-  .paginate({ page, limit, maxLimit })
-  .build() // Returns { sql, values }
-```
-
-### Type-Safe Wrapper
-
-```typescript
-createTypedComposer(schema, table)
-  // Same methods as QueryComposer, but with compile-time type checking
-```
-
-### Eager Loading
-
-```typescript
-createModelQuery(model, table)
-  // All QueryComposer methods plus:
-  .include(relationName, options?)
-  .build() // Returns records with relations populated
-```
-
-### Composition
-
-```typescript
-// Fragments (13 pre-built)
-dateRange(field, start, end)
-inList(field, values)
-contains(field, value)
-// ... and 10 more
-
-// Scopes
-scope(callback)
-parameterizedScope(callback)
-
-// Merge
-merge(composer1, composer2)
-mergeAll([composer1, composer2, ...])
-```
-
-### PostgreSQL
-
-```typescript
-// JSONB (11 operators)
-jsonbContains(field, value)
-jsonbPath(field, path)
-// ... and 9 more
-
-// Full-Text Search
-fullTextSearch(field, query)
-fullTextRank(field, query)
-
-// Recursive CTE
-ancestorsCTE(table, idCol, parentCol, depth)
-descendantsCTE(table, idCol, parentCol, depth)
-```
+| API | Method | Returns |
+|-----|--------|---------|
+| `createQueryComposer(schema, table)` | `.where()` `.or()` `.not()` `.orderBy()` `.paginate()` `.join()` `.groupBy()` `.having()` `.select()` `.exclude()` | `.toParam()` → `{ text, values }` |
+| `createTypedComposer(schema, table)` | Same as above + compile-time type checking | `.toParam()` → `{ text, values }` |
+| `createModelQuery(model, table)` | All above + `.include(relation, opts?)` | `.build()` → records with relations |
+| `scope(callback)` | Reusable query modifier | `.apply(scope)` |
+| `merge(qc1, qc2)` | Combine composers | QueryComposer |
 
 ## Documentation
 
-Comprehensive documentation available in `/docs`:
+- **[Project Overview](docs/project-overview-pdr.md)** - Goals, features, requirements
+- **[Codebase Summary](docs/codebase-summary.md)** - Module breakdown, metrics
+- **[Code Standards](docs/code-standards.md)** - Conventions, patterns
+- **[System Architecture](docs/system-architecture.md)** - Design, data flow
+- **[Project Roadmap](docs/project-roadmap.md)** - Versioned milestones
 
-- **[project-overview-pdr.md](docs/project-overview-pdr.md)** - Project goals, features, requirements
-- **[codebase-summary.md](docs/codebase-summary.md)** - Code structure, modules, metrics
-- **[code-standards.md](docs/code-standards.md)** - Development standards, patterns, conventions
-- **[system-architecture.md](docs/system-architecture.md)** - System design, data flow, extension points
+### Feature Guides
 
-## Examples
-
-### Conditional Queries
-
-```typescript
-const composer = createQueryComposer(userSchema, 'users');
-
-if (email) composer.where('email__exact', email);
-if (status) composer.where('status__exact', status);
-if (minAge) composer.where('age__gte', minAge);
-
-const { sql, values } = composer.build();
-```
-
-### Complex Filtering
-
-```typescript
-const query = createQueryComposer(schema, 'posts');
-
-query
-  .where('status__exact', 'published')
-  .andWhere('created_at__gte', new Date('2024-01-01'))
-  .orWhere('featured__exact', true)
-  .orderBy('created_at', 'DESC')
-  .paginate({ page: 1, limit: 10 });
-
-const { sql, values } = query.build();
-```
-
-### Batch Loading
-
-```typescript
-import { createRelationLoader } from 'pg-query-composer/relations';
-import DataLoader from 'dataloader';
-
-const postLoader = createRelationLoader({
-  relation: 'posts',
-  batchFn: async (userIds) => {
-    // Fetch all posts for all userIds in one query
-    const posts = await db.query(
-      'SELECT * FROM posts WHERE user_id = ANY($1)',
-      [userIds]
-    );
-    return userIds.map(id => posts.filter(p => p.user_id === id));
-  },
-});
-
-const post = await postLoader.load(userId);
-```
+- **[Core Builder](docs/guide-core-builder.md)** - WHERE, JOINs, pagination, sorting
+- **[Composition](docs/guide-composition.md)** - Fragments, scopes, merge
+- **[Subqueries](docs/guide-subqueries.md)** - IN, EXISTS, LATERAL
+- **[Relations](docs/guide-relations.md)** - Models, eager loading, batch loading
+- **[PostgreSQL](docs/guide-postgresql.md)** - JSONB, Full-Text Search, CTEs
 
 ## Performance
 
