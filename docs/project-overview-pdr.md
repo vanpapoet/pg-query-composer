@@ -3,7 +3,7 @@
 ## Project Identity
 
 **Name:** pg-query-composer
-**Version:** 0.1.0 (Initial Release)
+**Version:** 1.0.1
 **Type:** Advanced PostgreSQL Query Builder Library
 **Language:** TypeScript
 **Target Audience:** Node.js/TypeScript developers using PostgreSQL
@@ -244,7 +244,7 @@ const loader = createRelationLoader({
 
 ## Status & Roadmap
 
-### Current Status: v0.1.0 - Initial Release
+### Current Status: v1.0.1
 - Core query builder complete
 - All operator categories implemented
 - Relations and eager loading functional
@@ -252,7 +252,7 @@ const loader = createRelationLoader({
 - Type-safe wrappers ready
 - Test suite comprehensive
 
-### Future Roadmap (Post-v0.1.0)
+### Future Roadmap (Post-v1.0.1)
 
 **v0.2.0 - Performance & DevX**
 - Query caching layer
@@ -270,7 +270,7 @@ const loader = createRelationLoader({
 - Performance analysis helpers
 - Integration examples (Express, Fastify, NestJS)
 
-## Acceptance Criteria (v0.1.0)
+## Acceptance Criteria (v1.0.1)
 
 - [x] Core QueryComposer with 34 operators
 - [x] Type-safe TypedQueryComposer wrapper
@@ -357,4 +357,4 @@ console.log('Values:', values);
 **Document Version:** 1.0
 **Last Updated:** 2026-02-07
 **Author:** Documentation Team
-**Status:** Complete for v0.1.0
+**Status:** Complete for v1.0.1

@@ -640,7 +640,7 @@ Handles:
 **Version:**
 
 ```typescript
-export const VERSION = '0.1.0'
+export const VERSION = '1.0.1'
 ```
 
 **All Public Exports:** 100+ named exports covering classes, functions, and types from all modules.

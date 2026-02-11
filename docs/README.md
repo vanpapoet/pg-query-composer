@@ -119,7 +119,7 @@ Architectural overview including:
 **Location:** `/docs/project-roadmap.md`
 
 Development planning and vision including:
-- Current status (v0.1.0 complete)
+- Current status (v1.0.1)
 - Versioned roadmap: v0.2.0 → v1.0.0+
 - Feature pipeline for each version
 - Known limitations and future improvements

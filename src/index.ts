@@ -7,7 +7,7 @@
  * @packageDocumentation
  */
 
-export const VERSION = '0.1.0';
+export const VERSION = '1.0.1';
 
 // Core exports
 export { QueryComposer, createQueryComposer } from './core/query-composer';

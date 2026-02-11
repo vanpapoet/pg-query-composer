@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Version:** 0.1.0 (Initial Release - 2026-02-07)
+**Version:** 1.0.1
 
 All core features complete and production-ready:
 - 34 operators across 6 categories
@@ -233,7 +233,7 @@ All core features complete and production-ready:
 
 ## Success Metrics
 
-### v0.1.0 (Completed)
+### v1.0.1 (Completed)
 
 - [x] 34 operators implemented
 - [x] Type-safe queries via TypedQueryComposer
@@ -390,7 +390,7 @@ Once v1.0 is released, the project will focus on:
 
 | Version | Quarter | Status | Key Features |
 |---------|---------|--------|--------------|
-| 0.1.0 | Q1 2026 | Released | Core, Relations, PG features |
+| 1.0.1 | Q1 2026 | Released | Core, Relations, PG features |
 | 0.2.0 | Q2 2026 | Planned | Caching, Error messages, Zod ext. |
 | 0.3.0 | Q3 2026 | Planned | Window funcs, CTEs, HAVING |
 | 0.4.0 | Q4 2026 | Planned | Developer tools, Integrations |
