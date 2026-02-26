@@ -2,10 +2,15 @@
 
 package-lock.json
 node_modules/
+dist
 
 .claude
 .opencode
 plans/templates
 .repomixignore
-CLAUDE.md
+# CLAUDE.md
 AGENTS.md
+plans/
+
+.serena
+.gemini
