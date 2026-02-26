@@ -11,6 +11,7 @@ plans/templates
 # CLAUDE.md
 AGENTS.md
 plans/
+docs/
 
 .serena
 .gemini
