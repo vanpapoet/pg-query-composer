@@ -17,6 +17,7 @@ export interface ParamResult {
  */
 /**
  * Replace ? placeholders with $N. Uses number array [idx] for fast mutable counter.
+ * Fast paths for 0 and 1 values (covers ~80% of operators).
  */
 function replaceParams(
   clause: string,
@@ -24,6 +25,20 @@ function replaceParams(
   pidx: number[],
   allValues: unknown[]
 ): string {
+  const vlen = values.length;
+
+  // Fast path: no params (isnull, today, thisweek, etc.)
+  if (vlen === 0) return clause;
+
+  // Fast path: single param (exact, gt, contains, etc.)
+  if (vlen === 1) {
+    pidx[0]++;
+    allValues.push(values[0]);
+    const qi = clause.indexOf('?');
+    return clause.slice(0, qi) + '$' + pidx[0] + clause.slice(qi + 1);
+  }
+
+  // General path: multiple params (between, in, etc.)
   let vi = 0;
   let result = '';
   let lastIdx = 0;
@@ -35,7 +50,7 @@ function replaceParams(
       lastIdx = i + 1;
     }
   }
-  return lastIdx === 0 ? clause : result + clause.slice(lastIdx);
+  return result + clause.slice(lastIdx);
 }
 
 /**
