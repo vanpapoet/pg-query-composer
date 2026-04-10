@@ -1,6 +1,12 @@
 import * as z from 'zod';
 
 /**
+ * WeakMap cache for extractZodColumns results.
+ * Same schema object always yields same columns — avoid re-extracting.
+ */
+const zodColumnsCache = new WeakMap<object, string[]>();
+
+/**
  * Check if an object looks like a ZodObject (duck-typing).
  * Supports both zod v3 and v4 schemas by checking for .shape property
  * instead of relying solely on instanceof.
@@ -17,15 +23,24 @@ function isZodObjectLike(schema: unknown): schema is { shape: Record<string, unk
 
 /**
  * Extract column names from a Zod schema.
- * Supports both zod v3 and v4 schemas via duck-typing fallback.
+ * Results are cached per schema reference via WeakMap.
  */
 export function extractZodColumns(schema: z.ZodTypeAny): string[] {
+  const cached = zodColumnsCache.get(schema);
+  if (cached) return cached;
+
+  const result = extractZodColumnsUncached(schema);
+  zodColumnsCache.set(schema, result);
+  return result;
+}
+
+function extractZodColumnsUncached(schema: z.ZodTypeAny): string[] {
   // Prefer instanceof for exact match (same zod version)
   if (schema instanceof z.ZodObject) {
     return Object.keys(schema.shape);
   }
 
-  // Duck-typing fallback for cross-version compatibility (e.g., zod v4 schema in zod v3 consumer)
+  // Duck-typing fallback for cross-version compatibility
   if (isZodObjectLike(schema)) {
     return Object.keys(schema.shape);
   }
