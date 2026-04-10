@@ -1,8 +1,8 @@
-import squel from 'squel';
 import * as z from 'zod';
 import { extractZodColumns } from '../utils/zod-utils';
 import { OPERATORS, VALID_OPERATORS_SET } from './operators';
 import { InvalidColumnError, InvalidOperatorError } from './errors';
+import { SelectBuilder, select } from './sql-builder';
 import type {
   QueryOperator,
   QueryBuilderOptions,
@@ -14,9 +14,6 @@ import type {
   JoinConfig,
   HavingCondition,
 } from './types';
-
-// Configure squel for PostgreSQL
-const sql = squel.useFlavour('postgres');
 
 /**
  * Advanced SQL Query Composer
@@ -425,7 +422,7 @@ export class QueryComposer {
   // ===========================================================================
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private applyConditions(query: any): any {
+  private applyConditions(query: SelectBuilder): SelectBuilder {
     // Apply AND conditions
     for (const cond of this.conditions) {
       if (cond.raw && cond.rawCondition) {
@@ -467,7 +464,7 @@ export class QueryComposer {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private applyJoins(query: any): any {
+  private applyJoins(query: SelectBuilder): SelectBuilder {
     for (const join of this.joins) {
       const tableRef = join.alias ? `${join.table} ${join.alias}` : join.table;
 
@@ -499,8 +496,8 @@ export class QueryComposer {
   /**
    * Build SELECT query
    */
-  toSelect(): squel.Select {
-    let query = sql.select().from(this.table);
+  toSelect(): SelectBuilder {
+    let query = select().from(this.table);
 
     // Apply fields
     const fields = this.getSelectFields();
@@ -540,8 +537,8 @@ export class QueryComposer {
   /**
    * Build COUNT query
    */
-  toCount(): squel.Select {
-    let query = sql.select().from(this.table).field('COUNT(*)', 'total');
+  toCount(): SelectBuilder {
+    let query = select().from(this.table).field('COUNT(*)', 'total');
 
     query = this.applyJoins(query);
     query = this.applyConditions(query);
