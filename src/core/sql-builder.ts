@@ -62,6 +62,14 @@ export class SelectBuilder {
     return this;
   }
 
+  /**
+   * Add WHERE clause with values as array (avoids spread overhead)
+   */
+  whereArr(condition: string, values: unknown[]): this {
+    this._wheres.push({ condition, values });
+    return this;
+  }
+
   group(field: string): this {
     this._groups.push(field);
     return this;
