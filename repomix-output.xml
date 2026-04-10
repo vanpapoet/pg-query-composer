@@ -79,126 +79,6 @@ vitest.config.ts
 <files>
 This section contains the contents of the repository's files.
 
-<file path="CLAUDE.md">
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Role & Responsibilities
-
-Analyze user requirements, delegate tasks to sub-agents, ensure cohesive delivery meeting specs and architecture standards.
-
-## Commands
-
-```bash
-npm run build        # Compile TypeScript (tsc) → dist/
-npm test             # Run tests once (vitest run)
-npm run test:watch   # Run tests in watch mode (vitest)
-npm run lint         # Lint source (eslint src --ext .ts)
-```
-
-## Tech Stack
-
-- **TypeScript** (strict mode, ES2022, CommonJS output)
-- **squel** - SQL query builder (runtime dep)
-- **zod** - Schema validation (peer dep ^3.23.0)
-- **dataloader** - Batch loading for relations (dev dep)
-- **vitest** - Test framework (globals: true, V8 coverage)
-
-## Architecture
-
-```
-src/                          # 3,485 LOC, 19 files
-├── index.ts                  # Barrel export (all public API)
-├── core/                     # QueryComposer class, 34 operators, types, errors
-├── composition/              # Reusable fragments, scopes, merge utilities
-├── subquery/                 # Subquery builders, EXISTS/NOT EXISTS, lateral
-├── relations/                # Model registry, eager loading, DataLoader batch loading
-├── types/                    # TypedQueryComposer (compile-time validation)
-├── pg/                       # PostgreSQL: JSONB, Full-Text Search, Recursive CTEs
-└── utils/                    # Zod schema introspection (v3/v4 compat)
-
-tests/                        # 20 files, 120+ test cases
-├── core/                     # QueryComposer, operators, types, errors
-├── composition/              # conditional, fragment, merge, scope
-├── subquery/                 # builder, exists, where-in
-├── relations/                # define, include, loader, types
-├── pg/                       # fts, jsonb, recursive
-├── types/                    # infer
-└── integration/              # full-workflow (11 real-world scenarios)
-```
-
-**Package exports:** `.` (main), `./composition`, `./subquery`, `./relations`, `./pg`
-
-**Key patterns:** Builder (fluent API), Factory functions, Scope pattern, DataLoader (N+1 prevention), Django-style operators (`field__operator=value`)
-
-## UX Preferences
-
-**Clarification questions:** ALWAYS use `AskUserQuestion` with interactive checklists. Never free-form text.
-- `multiSelect: true` by default, 2-4 options, `header` max 12 chars
-
-## Workflows
-
-- Primary: `./.claude/workflows/primary-workflow.md`
-- Dev rules: `./.claude/workflows/development-rules.md`
-- Orchestration: `./.claude/workflows/orchestration-protocol.md`
-- Docs: `./.claude/workflows/documentation-management.md`
-
-**Rules:**
-- Follow dev rules in `./.claude/workflows/development-rules.md` strictly
-- Read `./README.md` before planning any implementation
-- Activate relevant skills from catalog during the process
-- Sacrifice grammar for concision in reports; list unresolved questions at end
-- For `YYMMDD` dates: use `bash -c 'date +%y%m%d'` (not model knowledge)
-
-## Documentation Management
-
-Docs live in `./docs/` — keep updated:
-
-```
-./docs
-├── project-overview-pdr.md   # Project overview & PDR
-├── code-standards.md         # TypeScript conventions, patterns
-├── codebase-summary.md       # Module breakdown, dependency graph
-└── system-architecture.md    # 7-layer architecture, data flow
-```
-
-**IMPORTANT:** Follow all instructions in this CLAUDE.md, especially the Workflows section. This is mandatory.
-
-**IMPORTANT:** After each response completes, run `open "raycast://extensions/raycast/raycast/confetti"`.
-
-## npm Publishing
-
-- **Registry:** `https://registry.npmjs.org/` (must be HTTPS)
-- **Author:** vanpapoet | **Org:** poetart
-- **Publish workflow:** `npm whoami` → `npm run build` → `npm pack --dry-run` → `npm publish`
-- Before any registry operation: verify auth with `npm whoami` first
-- Interactive commands (`npm login`, `npm adduser`): cannot run via Bash tool — instruct user to run in separate terminal
-- Before publish: run security scan (token patterns, private keys, connection strings, `npm pack` output)
-- Granular tokens have limited permissions — org management requires full-access token or web UI
-
-## MCP & Context Optimization
-
-**Priority Tooling:** Always prioritize `serena` MCP server (`.claude/.mcp.json`) over manual file reads.
-
-**Workflow:** `get_symbols_overview` → `find_symbol`/`search_for_pattern` → `Read` (targeted lines) → `write_memory` (persist context)
-
-**Key tools:** `get_symbols_overview` (file structure), `find_symbol` (locate definitions), `find_referencing_symbols` (trace usages), `search_for_pattern` (cross-file regex), `write_memory`/`read_memory` (cross-session persistence)
-
-**Rule:** Only `Read` full files if serena summaries are insufficient
-
-## Subagent Rules (Learnings)
-
-- Scout agents: instruct to NOT create files — output summary in response only
-- Docs-manager/writer agents: instruct to NOT commit — main agent controls git
-- Subagents creating markdown: files go in `docs/` or `plans/` only, never project root
-- README.md updates: enforce max 300 lines limit in prompt
-- Avoid parallelizing Bash calls that may hit hooks — sibling error cascade on hook block
-- MCP discovery agents (`mcp-manager`): instruct to NOT create files — return tool list in response only
-- Always read `development-rules.md` and `README.md` before starting any task — CLAUDE.md mandates this
-- Never use `cat`/`find` via Bash for file reads/search — use `Read`/`Glob`/`Grep` tools exclusively
-</file>
-
 <file path="src/composition/fragment.ts">
 import type { QueryOperator } from '../core/types';
 
@@ -3582,6 +3462,183 @@ export function extractZodColumns(schema: z.ZodTypeAny): string[] {
 }
 </file>
 
+<file path="CLAUDE.md">
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Role & Responsibilities
+
+Your role is to analyze user requirements, delegate tasks to appropriate sub-agents, and ensure cohesive delivery of features that meet specifications and architectural standards.
+
+## Workflows
+
+- Primary workflow: `./.claude/rules/primary-workflow.md`
+- Development rules: `./.claude/rules/development-rules.md`
+- Orchestration protocols: `./.claude/rules/orchestration-protocol.md`
+- Documentation management: `./.claude/rules/documentation-management.md`
+- And other workflows: `./.claude/rules/*`
+
+**IMPORTANT:** Analyze the skills catalog and activate the skills that are needed for the task during the process.
+**IMPORTANT:** You must follow strictly the development rules in `./.claude/rules/development-rules.md` file.
+**IMPORTANT:** Before you plan or proceed any implementation, always read the `./README.md` file first to get context.
+**IMPORTANT:** Sacrifice grammar for the sake of concision when writing reports.
+**IMPORTANT:** In reports, list any unresolved questions at the end, if any.
+
+## UX Preferences
+
+**MANDATORY:** Never ask clarification questions as free-form text.
+Always use `AskUserQuestion` tool with `multiSelect: true`, 2-4 options, `header` ≤ 12 chars.
+
+## Hook Response Protocol
+
+### Privacy Block Hook (`@@PRIVACY_PROMPT@@`)
+
+When a tool call is blocked by the privacy-block hook, the output contains a JSON marker between `@@PRIVACY_PROMPT_START@@` and `@@PRIVACY_PROMPT_END@@`. **You MUST use the `AskUserQuestion` tool** to get proper user approval.
+
+**Required Flow:**
+
+1. Parse the JSON from the hook output
+2. Use `AskUserQuestion` with the question data from the JSON
+3. Based on user's selection:
+   - **"Yes, approve access"** → Use `bash cat "filepath"` to read the file (bash is auto-approved)
+   - **"No, skip this file"** → Continue without accessing the file
+
+**Example AskUserQuestion call:**
+```json
+{
+  "questions": [{
+    "question": "I need to read \".env\" which may contain sensitive data. Do you approve?",
+    "header": "File Access",
+    "options": [
+      { "label": "Yes, approve access", "description": "Allow reading .env this time" },
+      { "label": "No, skip this file", "description": "Continue without accessing this file" }
+    ],
+    "multiSelect": false
+  }]
+}
+```
+
+**IMPORTANT:** Always ask the user via `AskUserQuestion` first. Never try to work around the privacy block without explicit user approval.
+
+## Python Scripts (Skills)
+
+When running Python scripts from `.claude/skills/`, use the venv Python interpreter:
+- **Linux/macOS:** `.claude/skills/.venv/bin/python3 scripts/xxx.py`
+- **Windows:** `.claude\skills\.venv\Scripts\python.exe scripts\xxx.py`
+
+This ensures packages installed by `install.sh` (google-genai, pypdf, etc.) are available.
+
+**IMPORTANT:** When scripts of skills failed, don't stop, try to fix them directly.
+
+## [IMPORTANT] Consider Modularization
+- If a code file exceeds 200 lines of code, consider modularizing it
+- Check existing modules before creating new
+- Analyze logical separation boundaries (functions, classes, concerns)
+- Use kebab-case naming with long descriptive names, it's fine if the file name is long because this ensures file names are self-documenting for LLM tools (Grep, Glob, Search)
+- Write descriptive code comments
+- After modularization, continue with main task
+- When not to modularize: Markdown files, plain text files, bash scripts, configuration files, environment variables files, etc.
+
+## Documentation Management
+
+We keep all important docs in `./docs` folder and keep updating them, structure like below:
+
+```
+./docs
+├── project-overview-pdr.md
+├── code-standards.md
+├── codebase-summary.md
+├── design-guidelines.md
+├── deployment-guide.md
+├── system-architecture.md
+└── project-roadmap.md
+```
+
+## MCP & Context Optimization
+
+**Priority Tooling:** Always prioritize `serena` MCP server (`.claude/.mcp.json`) over manual file reads.
+
+**Session Start:** Call `initial_instructions` first to get Serena's session guidance; call `onboarding` if project has never been onboarded.
+
+**Workflow:** `get_symbols_overview` → `find_symbol`/`search_for_pattern` → `Read` (targeted lines) → `write_memory` (persist context)
+
+**Key tools:**
+- `initial_instructions` / `onboarding` — session setup & project onboarding
+- `get_symbols_overview` — file/symbol structure overview
+- `find_symbol` — locate definitions
+- `find_referencing_symbols` — trace usages
+- `search_for_pattern` — cross-file regex search
+- `list_dir` / `find_file` — file navigation
+- `replace_symbol_body` / `insert_after_symbol` / `insert_before_symbol` / `rename_symbol` — symbolic edits
+- `write_memory` / `read_memory` / `list_memories` — cross-session persistence
+
+**Rule:** Only `Read` full files if serena summaries are insufficient
+
+**IMPORTANT:** *MUST READ* and *MUST COMPLY* all *INSTRUCTIONS* in project `./CLAUDE.md`, especially *WORKFLOWS* section is *CRITICALLY IMPORTANT*, this rule is *MANDATORY. NON-NEGOTIABLE. NO EXCEPTIONS. MUST REMEMBER AT ALL TIMES!!!*
+
+**IMPORTANT:** After each response is completed, run `open "raycast://extensions/raycast/raycast/confetti"`. This provides a clear signal that the work is done.
+</file>
+
+<file path="LICENSE">
+MIT License
+
+Copyright (c) 2026 pg-query-composer contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "tests"]
+}
+</file>
+
+<file path="vitest.config.ts">
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'node',
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+    },
+  },
+});
+</file>
+
 <file path="src/index.ts">
 /**
  * pg-query-composer
@@ -3592,7 +3649,7 @@ export function extractZodColumns(schema: z.ZodTypeAny): string[] {
  * @packageDocumentation
  */
 
-export const VERSION = '0.1.0';
+export const VERSION = '1.0.1';
 
 // Core exports
 export { QueryComposer, createQueryComposer } from './core/query-composer';
@@ -3741,84 +3798,10 @@ export {
 export { extractZodColumns } from './utils/zod-utils';
 </file>
 
-<file path="LICENSE">
-MIT License
-
-Copyright (c) 2026 pg-query-composer contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-</file>
-
-<file path="tsconfig.json">
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "commonjs",
-    "lib": ["ES2022"],
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "skipLibCheck": true
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tests"]
-}
-</file>
-
-<file path="vitest.config.ts">
-import { defineConfig } from 'vitest/config';
-
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'node',
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-    },
-  },
-});
-</file>
-
-<file path=".gitignore">
-.DS_Store
-
-package-lock.json
-node_modules/
-dist
-
-.claude
-.opencode
-plans/templates
-.repomixignore
-# CLAUDE.md
-AGENTS.md
-</file>
-
 <file path="package.json">
 {
   "name": "pg-query-composer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Advanced PostgreSQL query builder with dynamic composition, subqueries, and relations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -3881,6 +3864,97 @@ AGENTS.md
 }
 </file>
 
+<file path=".gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+dist/
+bin/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# package manager
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# semantic-release
+.nyc_output
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# flutter
+.dart_tool
+build
+GoogleService-Info.plist
+
+repomix-output.xml
+.serena/cache
+plans/**/*
+!plans/templates/*
+screenshots/*
+docs/screenshots/*
+docs/research/*
+logs.txt
+test-ck
+__pycache__
+
+# CK meta commands
+prompt.md
+ck.md
+
+# Gemini CLI settings (symlink to .claude/.mcp.json)
+.gemini/settings.json
+.claude/settings.bak.json
+
+!.claude/settings.local.json
+
+.serena
+.agents
+.claude
+docs
+guide
+scripts
+.repomixignore
+AGENTS.md
+GEMINI.md
+</file>
+
 <file path="README.md">
 # pg-query-composer
 
@@ -3924,31 +3998,32 @@ const userSchema = z.object({
   id: z.number(),
   email: z.string().email(),
   name: z.string(),
+  status: z.string(),
   created_at: z.string().datetime(),
 });
 
 // Create composer
 const composer = createQueryComposer(userSchema, 'users');
 
-// Build query
+// Build query with multiple conditions
 const result = composer
   .where('email__contains', 'example.com')
-  .where('created_at__gte', new Date('2024-01-01'))
-  .orderBy('created_at', 'DESC')
+  .where('status__exact', 'active')
+  .orderBy('-created_at') // Negative prefix = DESC
   .paginate({ page: 1, limit: 20 })
-  .build();
+  .toParam();
 
-console.log(result.sql);
-// SELECT * FROM users WHERE email LIKE $1 AND created_at >= $2 ORDER BY created_at DESC LIMIT 20 OFFSET 0
+console.log(result.text);
+// SELECT * FROM users WHERE email LIKE $1 AND status = $2 ORDER BY created_at DESC LIMIT 20 OFFSET 0
 
 console.log(result.values);
-// ['%example.com%', '2024-01-01T00:00:00Z']
+// ['%example.com%', 'active']
 ```
 
 ### Type-Safe Queries
 
 ```typescript
-import { createTypedComposer } from 'pg-query-composer';
+import { createTypedComposer } from 'pg-query-composer/types';
 
 const typed = createTypedComposer(userSchema, 'users');
 
@@ -3957,6 +4032,9 @@ typed.where('invalid_field__exact', 'value'); // ✗ TypeScript error
 
 // Type-safe: 'email' exists in schema
 typed.where('email__exact', 'test@example.com'); // ✓
+
+const { text, values } = typed.toParam();
+console.log('Safe query built with compile-time validation');
 ```
 
 ### Eager Loading with Relations
@@ -3994,15 +4072,20 @@ const users = await userQuery
 ### Reusable Filters
 
 ```typescript
-import { fragment, dateRange, scope } from 'pg-query-composer/composition';
+import { dateRange, contains, fragment } from 'pg-query-composer/composition';
+
+const composer = createQueryComposer(userSchema, 'users');
 
 // Pre-built fragments
-const f = dateRange('created_at', startDate, endDate);
-composer.where(...f);
+const startDate = new Date('2024-01-01');
+const endDate = new Date('2024-12-31');
+const dateFilter = dateRange('created_at', startDate, endDate);
+const nameFilter = contains('name', 'John');
 
-// Reusable scopes
-const activeScope = scope((q) => q.where('deleted_at__isnull', true));
-composer.applyScope(activeScope);
+composer.where(...dateFilter).where(...nameFilter);
+
+const { text, values } = composer.toParam();
+console.log('Filtered by date range and name');
 ```
 
 ### PostgreSQL Features
@@ -4071,132 +4154,31 @@ const ancestors = ancestorsCTE('categories', 'id', 'parent_id', 5);
 
 ## API Reference
 
-### Core Builder
+See full API docs in [`/docs`](docs/):
 
-```typescript
-createQueryComposer(schema, table, options?)
-  .where(column, value)
-  .andWhere(column, value)
-  .orWhere(column, value)
-  .notWhere(column, value)
-  .join(table, alias?, on)
-  .groupBy(...fields)
-  .having(condition)
-  .orderBy(field, direction)
-  .select(...fields) / .exclude(...fields)
-  .paginate({ page, limit, maxLimit })
-  .build() // Returns { sql, values }
-```
-
-### Type-Safe Wrapper
-
-```typescript
-createTypedComposer(schema, table)
-  // Same methods as QueryComposer, but with compile-time type checking
-```
-
-### Eager Loading
-
-```typescript
-createModelQuery(model, table)
-  // All QueryComposer methods plus:
-  .include(relationName, options?)
-  .build() // Returns records with relations populated
-```
-
-### Composition
-
-```typescript
-// Fragments (13 pre-built)
-dateRange(field, start, end)
-inList(field, values)
-contains(field, value)
-// ... and 10 more
-
-// Scopes
-scope(callback)
-parameterizedScope(callback)
-
-// Merge
-merge(composer1, composer2)
-mergeAll([composer1, composer2, ...])
-```
-
-### PostgreSQL
-
-```typescript
-// JSONB (11 operators)
-jsonbContains(field, value)
-jsonbPath(field, path)
-// ... and 9 more
-
-// Full-Text Search
-fullTextSearch(field, query)
-fullTextRank(field, query)
-
-// Recursive CTE
-ancestorsCTE(table, idCol, parentCol, depth)
-descendantsCTE(table, idCol, parentCol, depth)
-```
+| API | Method | Returns |
+|-----|--------|---------|
+| `createQueryComposer(schema, table)` | `.where()` `.or()` `.not()` `.orderBy()` `.paginate()` `.join()` `.groupBy()` `.having()` `.select()` `.exclude()` | `.toParam()` → `{ text, values }` |
+| `createTypedComposer(schema, table)` | Same as above + compile-time type checking | `.toParam()` → `{ text, values }` |
+| `createModelQuery(model, table)` | All above + `.include(relation, opts?)` | `.build()` → records with relations |
+| `scope(callback)` | Reusable query modifier | `.apply(scope)` |
+| `merge(qc1, qc2)` | Combine composers | QueryComposer |
 
 ## Documentation
 
-Comprehensive documentation available in `/docs`:
+- **[Project Overview](docs/project-overview-pdr.md)** - Goals, features, requirements
+- **[Codebase Summary](docs/codebase-summary.md)** - Module breakdown, metrics
+- **[Code Standards](docs/code-standards.md)** - Conventions, patterns
+- **[System Architecture](docs/system-architecture.md)** - Design, data flow
+- **[Project Roadmap](docs/project-roadmap.md)** - Versioned milestones
 
-- **[project-overview-pdr.md](docs/project-overview-pdr.md)** - Project goals, features, requirements
-- **[codebase-summary.md](docs/codebase-summary.md)** - Code structure, modules, metrics
-- **[code-standards.md](docs/code-standards.md)** - Development standards, patterns, conventions
-- **[system-architecture.md](docs/system-architecture.md)** - System design, data flow, extension points
+### Feature Guides
 
-## Examples
-
-### Conditional Queries
-
-```typescript
-const composer = createQueryComposer(userSchema, 'users');
-
-if (email) composer.where('email__exact', email);
-if (status) composer.where('status__exact', status);
-if (minAge) composer.where('age__gte', minAge);
-
-const { sql, values } = composer.build();
-```
-
-### Complex Filtering
-
-```typescript
-const query = createQueryComposer(schema, 'posts');
-
-query
-  .where('status__exact', 'published')
-  .andWhere('created_at__gte', new Date('2024-01-01'))
-  .orWhere('featured__exact', true)
-  .orderBy('created_at', 'DESC')
-  .paginate({ page: 1, limit: 10 });
-
-const { sql, values } = query.build();
-```
-
-### Batch Loading
-
-```typescript
-import { createRelationLoader } from 'pg-query-composer/relations';
-import DataLoader from 'dataloader';
-
-const postLoader = createRelationLoader({
-  relation: 'posts',
-  batchFn: async (userIds) => {
-    // Fetch all posts for all userIds in one query
-    const posts = await db.query(
-      'SELECT * FROM posts WHERE user_id = ANY($1)',
-      [userIds]
-    );
-    return userIds.map(id => posts.filter(p => p.user_id === id));
-  },
-});
-
-const post = await postLoader.load(userId);
-```
+- **[Core Builder](docs/guide-core-builder.md)** - WHERE, JOINs, pagination, sorting
+- **[Composition](docs/guide-composition.md)** - Fragments, scopes, merge
+- **[Subqueries](docs/guide-subqueries.md)** - IN, EXISTS, LATERAL
+- **[Relations](docs/guide-relations.md)** - Models, eager loading, batch loading
+- **[PostgreSQL](docs/guide-postgresql.md)** - JSONB, Full-Text Search, CTEs
 
 ## Performance
 
@@ -4230,7 +4212,7 @@ MIT - See LICENSE file
 
 ## Changelog
 
-### v0.1.0 (2026-02-07) - Initial Release
+### v1.0.1 (2026-02-11)
 
 - Core QueryComposer with 34 operators
 - Type-safe TypedQueryComposer wrapper
