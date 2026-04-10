@@ -177,12 +177,16 @@ export class SelectBuilder {
       }
     }
 
-    // LIMIT / OFFSET
+    // LIMIT / OFFSET — parameterized for PG plan reuse
     if (this._limit !== null) {
-      sql += ' LIMIT ' + this._limit;
+      paramIndex++;
+      allValues.push(this._limit);
+      sql += ' LIMIT $' + paramIndex;
     }
     if (this._offset !== null) {
-      sql += ' OFFSET ' + this._offset;
+      paramIndex++;
+      allValues.push(this._offset);
+      sql += ' OFFSET $' + paramIndex;
     }
 
     return { text: sql, values: allValues };
