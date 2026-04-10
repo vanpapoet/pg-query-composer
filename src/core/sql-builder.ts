@@ -21,6 +21,18 @@ function replaceParams(
   state: { paramIndex: number },
   allValues: unknown[]
 ): string {
+  // Fast path: no params (isnull, today, etc.)
+  if (values.length === 0) return clause;
+
+  // Fast path: single param (exact, gt, gte, lt, lte, contains, etc.)
+  if (values.length === 1) {
+    state.paramIndex++;
+    allValues.push(values[0]);
+    const qIdx = clause.indexOf('?');
+    return clause.slice(0, qIdx) + '$' + state.paramIndex + clause.slice(qIdx + 1);
+  }
+
+  // General path: multiple params
   let vi = 0;
   let result = '';
   let lastIdx = 0;
@@ -32,7 +44,7 @@ function replaceParams(
       lastIdx = i + 1;
     }
   }
-  return lastIdx === 0 ? clause : result + clause.slice(lastIdx);
+  return result + clause.slice(lastIdx);
 }
 
 /**
