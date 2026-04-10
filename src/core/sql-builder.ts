@@ -15,14 +15,19 @@ export interface ParamResult {
 /**
  * Minimal SELECT query builder for PostgreSQL.
  * Produces parameterized queries with $1, $2, ... placeholders.
+ * Uses parallel arrays instead of object arrays to minimize allocations.
  */
 export class SelectBuilder {
   private _table = '';
   private _fields: string[] = [];
   private _joins: string[] = [];
-  private _wheres: WhereClause[] = [];
+  // Parallel arrays for WHERE clauses — avoids per-clause object allocation
+  private _wConds: string[] = [];
+  private _wVals: unknown[][] = [];
   private _groups: string[] = [];
-  private _havings: WhereClause[] = [];
+  // Parallel arrays for HAVING clauses
+  private _hConds: string[] = [];
+  private _hVals: unknown[][] = [];
   private _orders: string[] = [];
   private _limit: number | null = null;
   private _offset: number | null = null;
@@ -58,7 +63,8 @@ export class SelectBuilder {
   }
 
   where(condition: string, ...values: unknown[]): this {
-    this._wheres.push({ condition, values });
+    this._wConds.push(condition);
+    this._wVals.push(values);
     return this;
   }
 
@@ -66,7 +72,8 @@ export class SelectBuilder {
    * Add WHERE clause with values as array (avoids spread overhead)
    */
   whereArr(condition: string, values: unknown[]): this {
-    this._wheres.push({ condition, values });
+    this._wConds.push(condition);
+    this._wVals.push(values);
     return this;
   }
 
@@ -75,8 +82,9 @@ export class SelectBuilder {
     return this;
   }
 
-  having(condition: string, ...values: unknown[]): this {
-    this._havings.push({ condition, values });
+  having(condition: string, values: unknown[]): this {
+    this._hConds.push(condition);
+    this._hVals.push(values);
     return this;
   }
 
@@ -132,16 +140,14 @@ export class SelectBuilder {
 
     // JOINs
     for (let i = 0; i < this._joins.length; i++) {
-      sql += ` ${this._joins[i]}`;
+      sql += ' ' + this._joins[i];
     }
 
-    // WHERE — build inline to avoid intermediate array + join
-    if (this._wheres.length > 0) {
-      const w0 = this._wheres[0];
-      let whereStr = '(' + replaceParams(w0.condition, w0.values) + ')';
-      for (let i = 1; i < this._wheres.length; i++) {
-        const w = this._wheres[i];
-        whereStr += ' AND (' + replaceParams(w.condition, w.values) + ')';
+    // WHERE — build inline using parallel arrays
+    if (this._wConds.length > 0) {
+      let whereStr = '(' + replaceParams(this._wConds[0], this._wVals[0]) + ')';
+      for (let i = 1; i < this._wConds.length; i++) {
+        whereStr += ' AND (' + replaceParams(this._wConds[i], this._wVals[i]) + ')';
       }
       sql += ' WHERE ' + whereStr;
     }
@@ -154,13 +160,11 @@ export class SelectBuilder {
       }
     }
 
-    // HAVING — build inline to avoid intermediate array + join
-    if (this._havings.length > 0) {
-      const h0 = this._havings[0];
-      let havingStr = '(' + replaceParams(h0.condition, h0.values) + ')';
-      for (let i = 1; i < this._havings.length; i++) {
-        const h = this._havings[i];
-        havingStr += ' AND (' + replaceParams(h.condition, h.values) + ')';
+    // HAVING — build inline using parallel arrays
+    if (this._hConds.length > 0) {
+      let havingStr = '(' + replaceParams(this._hConds[0], this._hVals[0]) + ')';
+      for (let i = 1; i < this._hConds.length; i++) {
+        havingStr += ' AND (' + replaceParams(this._hConds[i], this._hVals[i]) + ')';
       }
       sql += ' HAVING ' + havingStr;
     }
@@ -194,17 +198,12 @@ export class SelectBuilder {
     for (let i = values.length; i >= 1; i--) {
       const val = values[i - 1];
       const replacement = typeof val === 'string'
-        ? `'${val.replace(/'/g, "''")}'`
+        ? "'" + val.replace(/'/g, "''") + "'"
         : val === null ? 'NULL' : String(val);
-      result = result.replace(`$${i}`, replacement);
+      result = result.replace('$' + i, replacement);
     }
     return result;
   }
-}
-
-interface WhereClause {
-  condition: string;
-  values: unknown[];
 }
 
 /**

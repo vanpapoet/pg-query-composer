@@ -551,7 +551,7 @@ export class QueryComposer {
 
     // Apply HAVING
     for (const having of this.havingConditions) {
-      query = query.having(having.condition, ...having.values);
+      query = query.having(having.condition, having.values);
     }
 
     // Apply sorting
@@ -583,7 +583,7 @@ export class QueryComposer {
     }
 
     for (const having of this.havingConditions) {
-      query = query.having(having.condition, ...having.values);
+      query = query.having(having.condition, having.values);
     }
 
     return query;
