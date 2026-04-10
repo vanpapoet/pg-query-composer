@@ -33,7 +33,7 @@ export class SelectBuilder {
   }
 
   field(expr: string, _alias?: string): this {
-    this._fields.push(_alias ? `${expr} AS ${_alias}` : expr);
+    this._fields.push(_alias ? expr + ' AS ' + _alias : expr);
     return this;
   }
 
@@ -43,17 +43,17 @@ export class SelectBuilder {
   }
 
   join(tableRef: string, _alias: undefined, on: string): this {
-    this._joins.push(`INNER JOIN ${tableRef} ON (${on})`);
+    this._joins.push('INNER JOIN ' + tableRef + ' ON (' + on + ')');
     return this;
   }
 
   left_join(tableRef: string, _alias: undefined, on: string): this {
-    this._joins.push(`LEFT JOIN ${tableRef} ON (${on})`);
+    this._joins.push('LEFT JOIN ' + tableRef + ' ON (' + on + ')');
     return this;
   }
 
   right_join(tableRef: string, _alias: undefined, on: string): this {
-    this._joins.push(`RIGHT JOIN ${tableRef} ON (${on})`);
+    this._joins.push('RIGHT JOIN ' + tableRef + ' ON (' + on + ')');
     return this;
   }
 
@@ -81,7 +81,7 @@ export class SelectBuilder {
   }
 
   order(column: string, asc: boolean): this {
-    this._orders.push(`${column} ${asc ? 'ASC' : 'DESC'}`);
+    this._orders.push(column + (asc ? ' ASC' : ' DESC'));
     return this;
   }
 
@@ -175,10 +175,10 @@ export class SelectBuilder {
 
     // LIMIT / OFFSET
     if (this._limit !== null) {
-      sql += ` LIMIT ${this._limit}`;
+      sql += ' LIMIT ' + this._limit;
     }
     if (this._offset !== null) {
-      sql += ` OFFSET ${this._offset}`;
+      sql += ' OFFSET ' + this._offset;
     }
 
     return { text: sql, values: allValues };
