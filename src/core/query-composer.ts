@@ -15,6 +15,22 @@ import type {
   HavingCondition,
 } from './types';
 
+// Negation map: operator → its negated form (avoids NOT wrapper in SQL)
+const NEGATED_OPERATORS: Partial<Record<QueryOperator, QueryOperator>> = {
+  exact: 'notexact',
+  notexact: 'exact',
+  gt: 'lte',
+  gte: 'lt',
+  lt: 'gte',
+  lte: 'gt',
+  isnull: 'isnotnull',
+  isnotnull: 'isnull',
+  in: 'notin',
+  notin: 'in',
+  between: 'notbetween',
+  notbetween: 'between',
+};
+
 // Default columns always included in whitelist
 const DEFAULT_COLUMNS = ['id', 'created_at', 'updated_at', 'deleted_at'] as const;
 
@@ -504,11 +520,18 @@ export class QueryComposer {
       }
     }
 
-    // Apply NOT conditions
+    // Apply NOT conditions — use negated operator when available, else wrap in NOT()
     for (const cond of this.notConditions) {
-      const handler = OPERATORS[cond.operator];
-      const [condStr, values] = handler(cond.column, cond.value);
-      query = query.whereArr('NOT (' + condStr + ')', values);
+      const negated = NEGATED_OPERATORS[cond.operator];
+      if (negated) {
+        const handler = OPERATORS[negated];
+        const [condStr, values] = handler(cond.column, cond.value);
+        query = query.whereArr(condStr, values);
+      } else {
+        const handler = OPERATORS[cond.operator];
+        const [condStr, values] = handler(cond.column, cond.value);
+        query = query.whereArr('NOT (' + condStr + ')', values);
+      }
     }
 
     return query;
