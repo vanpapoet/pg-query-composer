@@ -154,7 +154,8 @@ export class QueryComposer {
    * Add WHERE conditions (AND logic)
    */
   where(filters: Record<string, unknown>): this {
-    for (const [key, value] of Object.entries(filters)) {
+    for (const key in filters) {
+      const value = filters[key];
       if (value === undefined) continue;
 
       // Handle raw conditions
@@ -194,7 +195,8 @@ export class QueryComposer {
     const conditions: Condition[] = [];
 
     for (const filters of filterGroups) {
-      for (const [key, value] of Object.entries(filters)) {
+      for (const key in filters) {
+        const value = filters[key];
         if (value === undefined) continue;
 
         try {
@@ -216,7 +218,8 @@ export class QueryComposer {
    * Add NOT conditions
    */
   not(filters: Record<string, unknown>): this {
-    for (const [key, value] of Object.entries(filters)) {
+    for (const key in filters) {
+      const value = filters[key];
       if (value === undefined) continue;
 
       try {
