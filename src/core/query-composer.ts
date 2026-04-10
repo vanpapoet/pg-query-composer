@@ -453,17 +453,18 @@ export class QueryComposer {
   // QUERY BUILDING METHODS
   // ===========================================================================
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private applyConditions(query: SelectBuilder): SelectBuilder {
     // Apply AND conditions
     for (const cond of this.conditions) {
       if (cond.raw && cond.rawCondition) {
-        query = query.where(cond.rawCondition, cond.value as unknown[]);
+        query = query.where(cond.rawCondition, ...(cond.value as unknown[]));
         continue;
       }
 
       const handler = OPERATORS[cond.operator];
       const [condStr, values] = handler(cond.column, cond.value);
-      query = query.where(condStr, values);
+      query = query.where(condStr, ...values);
     }
 
     // Apply OR groups
@@ -480,7 +481,7 @@ export class QueryComposer {
 
       if (orConditions.length > 0) {
         const orExpr = `(${orConditions.join(' OR ')})`;
-        query = query.where(orExpr, orValues);
+        query = query.where(orExpr, ...orValues);
       }
     }
 
@@ -488,7 +489,7 @@ export class QueryComposer {
     for (const cond of this.notConditions) {
       const handler = OPERATORS[cond.operator];
       const [condStr, values] = handler(cond.column, cond.value);
-      query = query.where(`NOT (${condStr})`, values);
+      query = query.where(`NOT (${condStr})`, ...values);
     }
 
     return query;
@@ -547,7 +548,7 @@ export class QueryComposer {
 
     // Apply HAVING
     for (const having of this.havingConditions) {
-      query = query.having(having.condition, having.values);
+      query = query.having(having.condition, ...having.values);
     }
 
     // Apply sorting
@@ -579,7 +580,7 @@ export class QueryComposer {
     }
 
     for (const having of this.havingConditions) {
-      query = query.having(having.condition, having.values);
+      query = query.having(having.condition, ...having.values);
     }
 
     return query;
