@@ -524,6 +524,11 @@ export class QueryComposer {
       return this.selectedFields;
     }
 
+    // Short-circuit when no fields excluded (common case)
+    if (this.excludedFields.size === 0) {
+      return this.whitelist as string[];
+    }
+
     return this.whitelist.filter(
       (f) => !this.excludedFields.has(f)
     ) as string[];
