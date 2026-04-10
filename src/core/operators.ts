@@ -9,16 +9,6 @@ export type OperatorHandler = (
 ) => [string, unknown[]];
 
 /**
- * Build placeholder string "?, ?, ?" for N values without intermediate array
- */
-function placeholders(n: number): string {
-  if (n === 1) return '?';
-  let s = '?';
-  for (let i = 1; i < n; i++) s += ', ?';
-  return s;
-}
-
-/**
  * Built-in operator handlers
  */
 export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
@@ -44,12 +34,14 @@ export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
   in: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
     if (arr.length === 0) return ['FALSE', []];
-    return [`${col} IN (${placeholders(arr.length)})`, arr];
+    const placeholders = arr.map(() => '?').join(', ');
+    return [`${col} IN (${placeholders})`, arr];
   },
   notin: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
     if (arr.length === 0) return ['TRUE', []];
-    return [`${col} NOT IN (${placeholders(arr.length)})`, arr];
+    const placeholders = arr.map(() => '?').join(', ');
+    return [`${col} NOT IN (${placeholders})`, arr];
   },
   between: (col, val) => {
     const arr = Array.isArray(val) ? val : [];
@@ -100,15 +92,18 @@ export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
   // ===== ARRAY OPERATORS (PostgreSQL) =====
   arraycontains: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
-    return [`${col} @> ARRAY[${placeholders(arr.length)}]`, arr];
+    const placeholders = arr.map(() => '?').join(', ');
+    return [`${col} @> ARRAY[${placeholders}]`, arr];
   },
   arrayoverlap: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
-    return [`${col} && ARRAY[${placeholders(arr.length)}]`, arr];
+    const placeholders = arr.map(() => '?').join(', ');
+    return [`${col} && ARRAY[${placeholders}]`, arr];
   },
   arraycontained: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
-    return [`${col} <@ ARRAY[${placeholders(arr.length)}]`, arr];
+    const placeholders = arr.map(() => '?').join(', ');
+    return [`${col} <@ ARRAY[${placeholders}]`, arr];
   },
 };
 
