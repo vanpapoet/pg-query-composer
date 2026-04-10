@@ -15,6 +15,30 @@ import type {
   HavingCondition,
 } from './types';
 
+// Default columns always included in whitelist
+const DEFAULT_COLUMNS = ['id', 'created_at', 'updated_at', 'deleted_at'] as const;
+
+// Cache whitelist arrays and sets per schema (when no extraColumns)
+const whitelistCache = new WeakMap<object, { list: readonly string[]; set: ReadonlySet<string> }>();
+
+function buildWhitelist(schema: z.ZodTypeAny, extraColumns: string[]): { list: readonly string[]; set: ReadonlySet<string> } {
+  // Use cache only when no extraColumns (the common case)
+  if (extraColumns.length === 0) {
+    const cached = whitelistCache.get(schema);
+    if (cached) return cached;
+  }
+
+  const schemaColumns = extractZodColumns(schema);
+  const list = [...schemaColumns, ...extraColumns, ...DEFAULT_COLUMNS];
+  const set = new Set(list);
+  const result = { list, set };
+
+  if (extraColumns.length === 0) {
+    whitelistCache.set(schema, result);
+  }
+  return result;
+}
+
 /**
  * Advanced SQL Query Composer
  *
@@ -63,17 +87,10 @@ export class QueryComposer {
       aliases: options.aliases ?? {},
     };
 
-    // Build whitelist from schema + extra columns
-    const schemaColumns = extractZodColumns(schema);
-    this.whitelist = [
-      ...schemaColumns,
-      ...this.options.extraColumns,
-      'id',
-      'created_at',
-      'updated_at',
-      'deleted_at',
-    ];
-    this.whitelistSet = new Set(this.whitelist);
+    // Build whitelist from schema + extra columns (cached for common case)
+    const wl = buildWhitelist(schema, this.options.extraColumns);
+    this.whitelist = wl.list;
+    this.whitelistSet = wl.set;
   }
 
   // ===========================================================================
