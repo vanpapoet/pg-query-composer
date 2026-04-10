@@ -59,7 +59,7 @@ export class SelectBuilder {
     return this;
   }
 
-  where(condition: string, ...values: unknown[]): this {
+  where(condition: string, values: unknown[]): this {
     this._wheres.push({ condition, values });
     return this;
   }
@@ -69,7 +69,7 @@ export class SelectBuilder {
     return this;
   }
 
-  having(condition: string, ...values: unknown[]): this {
+  having(condition: string, values: unknown[]): this {
     this._havings.push({ condition, values });
     return this;
   }
