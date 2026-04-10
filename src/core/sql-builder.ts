@@ -121,14 +121,15 @@ export class SelectBuilder {
       sql += ` ${this._joins[i]}`;
     }
 
-    // WHERE
+    // WHERE — build inline to avoid intermediate array + join
     if (this._wheres.length > 0) {
-      const parts: string[] = [];
-      for (let i = 0; i < this._wheres.length; i++) {
+      const w0 = this._wheres[0];
+      let whereStr = '(' + replaceParams(w0.condition, w0.values) + ')';
+      for (let i = 1; i < this._wheres.length; i++) {
         const w = this._wheres[i];
-        parts.push(replaceParams(w.condition, w.values));
+        whereStr += ' AND (' + replaceParams(w.condition, w.values) + ')';
       }
-      sql += ` WHERE (${parts.join(') AND (')})`;
+      sql += ' WHERE ' + whereStr;
     }
 
     // GROUP BY
@@ -136,14 +137,15 @@ export class SelectBuilder {
       sql += ` GROUP BY ${this._groups.join(', ')}`;
     }
 
-    // HAVING
+    // HAVING — build inline to avoid intermediate array + join
     if (this._havings.length > 0) {
-      const parts: string[] = [];
-      for (let i = 0; i < this._havings.length; i++) {
+      const h0 = this._havings[0];
+      let havingStr = '(' + replaceParams(h0.condition, h0.values) + ')';
+      for (let i = 1; i < this._havings.length; i++) {
         const h = this._havings[i];
-        parts.push(replaceParams(h.condition, h.values));
+        havingStr += ' AND (' + replaceParams(h.condition, h.values) + ')';
       }
-      sql += ` HAVING (${parts.join(') AND (')})`;
+      sql += ' HAVING ' + havingStr;
     }
 
     // ORDER BY
