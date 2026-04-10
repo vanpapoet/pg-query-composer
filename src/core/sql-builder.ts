@@ -112,6 +112,8 @@ export class SelectBuilder {
 
     // Replace ? placeholders with $N without regex
     const replaceParams = (clause: string, values: unknown[]): string => {
+      // Fast path: no params to replace (isnull, today, thisweek, etc.)
+      if (values.length === 0) return clause;
       let vi = 0;
       let result = '';
       let lastIdx = 0;
