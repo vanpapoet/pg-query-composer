@@ -143,11 +143,11 @@ export class SelectBuilder {
       sql += ' ' + this._joins[i];
     }
 
-    // WHERE — build inline, no wrapping parens (conditions already self-contained)
+    // WHERE — build inline using parallel arrays
     if (this._wConds.length > 0) {
-      let whereStr = replaceParams(this._wConds[0], this._wVals[0]);
+      let whereStr = '(' + replaceParams(this._wConds[0], this._wVals[0]) + ')';
       for (let i = 1; i < this._wConds.length; i++) {
-        whereStr += ' AND ' + replaceParams(this._wConds[i], this._wVals[i]);
+        whereStr += ' AND (' + replaceParams(this._wConds[i], this._wVals[i]) + ')';
       }
       sql += ' WHERE ' + whereStr;
     }
