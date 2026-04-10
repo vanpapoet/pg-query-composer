@@ -13,10 +13,7 @@ export interface ParamResult {
 }
 
 /**
- * Replace ? placeholders with $N — extracted to module level to avoid closure allocation per toParam()
- */
-/**
- * Replace ? placeholders with $N. Uses number array [idx] for fast mutable counter.
+ * Replace ? placeholders with $N. Module-level to avoid closure allocation.
  */
 function replaceParams(
   clause: string,
@@ -153,13 +150,13 @@ export class SelectBuilder {
       sql += ' ' + this._joins[i];
     }
 
-    // WHERE — build inline using parallel arrays
+    // WHERE — collect processed clauses, join once
     if (this._wConds.length > 0) {
-      let whereStr = '(' + replaceParams(this._wConds[0], this._wVals[0], pidx, allValues) + ')';
-      for (let i = 1; i < this._wConds.length; i++) {
-        whereStr += ' AND (' + replaceParams(this._wConds[i], this._wVals[i], pidx, allValues) + ')';
+      const parts = new Array<string>(this._wConds.length);
+      for (let i = 0; i < this._wConds.length; i++) {
+        parts[i] = '(' + replaceParams(this._wConds[i], this._wVals[i], pidx, allValues) + ')';
       }
-      sql += ' WHERE ' + whereStr;
+      sql += ' WHERE ' + parts.join(' AND ');
     }
 
     // GROUP BY — build inline
