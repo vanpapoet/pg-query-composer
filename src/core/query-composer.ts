@@ -100,9 +100,9 @@ export class QueryComposer {
     column: string;
     operator: QueryOperator;
   } {
-    const parts = key.split(this.options.separator);
-    const column = parts[0];
-    const operator = (parts[1] || 'exact') as QueryOperator;
+    const sepIdx = key.indexOf(this.options.separator);
+    const column = sepIdx === -1 ? key : key.slice(0, sepIdx);
+    const operator = (sepIdx === -1 ? 'exact' : key.slice(sepIdx + this.options.separator.length)) as QueryOperator;
 
     if (!this.validateColumn(column)) {
       throw new InvalidColumnError(column, this.whitelist);
