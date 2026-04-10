@@ -60,7 +60,7 @@ export class SelectBuilder {
   }
 
   where(condition: string, ...values: unknown[]): this {
-    this._wheres.push(values.length > 0 ? { condition, values } : { condition, values: emptyArr });
+    this._wheres.push({ condition, values });
     return this;
   }
 
@@ -70,7 +70,7 @@ export class SelectBuilder {
   }
 
   having(condition: string, ...values: unknown[]): this {
-    this._havings.push(values.length > 0 ? { condition, values } : { condition, values: emptyArr });
+    this._havings.push({ condition, values });
     return this;
   }
 
@@ -200,9 +200,6 @@ interface WhereClause {
   condition: string;
   values: unknown[];
 }
-
-// Shared empty array to avoid allocations for parameterless conditions
-const emptyArr: unknown[] = [];
 
 /**
  * Create a new SELECT builder
