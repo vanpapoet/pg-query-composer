@@ -470,21 +470,22 @@ export class QueryComposer {
       query = query.whereArr(condStr, values);
     }
 
-    // Apply OR groups
+    // Apply OR groups — build expression inline to avoid join()
     for (const group of this.orGroups) {
-      const orConditions: string[] = [];
       const orValues: unknown[] = [];
+      let orExpr = '';
 
-      for (const cond of group.conditions) {
+      for (let i = 0; i < group.conditions.length; i++) {
+        const cond = group.conditions[i];
         const handler = OPERATORS[cond.operator];
         const [condStr, values] = handler(cond.column, cond.value);
-        orConditions.push(condStr);
-        orValues.push(...values);
+        if (i > 0) orExpr += ' OR ';
+        orExpr += condStr;
+        for (let j = 0; j < values.length; j++) orValues.push(values[j]);
       }
 
-      if (orConditions.length > 0) {
-        const orExpr = '(' + orConditions.join(' OR ') + ')';
-        query = query.whereArr(orExpr, orValues);
+      if (orExpr) {
+        query = query.whereArr('(' + orExpr + ')', orValues);
       }
     }
 
