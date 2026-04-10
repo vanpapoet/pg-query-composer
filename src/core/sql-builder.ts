@@ -12,28 +12,18 @@ export interface ParamResult {
   values: unknown[];
 }
 
-interface WhereClause {
-  condition: string;
-  values: unknown[];
-}
-
-// Shared empty arrays to avoid allocating per-instance for rarely-used clauses
-const EMPTY_STRINGS: readonly string[] = [];
-const EMPTY_WHERES: readonly WhereClause[] = [];
-
 /**
  * Minimal SELECT query builder for PostgreSQL.
  * Produces parameterized queries with $1, $2, ... placeholders.
- * Lazily allocates arrays for joins/groups/havings/orders since most queries don't use them.
  */
 export class SelectBuilder {
   private _table = '';
   private _fields: string[] = [];
-  private _joins: string[] | readonly string[] = EMPTY_STRINGS;
-  private _wheres: WhereClause[] | readonly WhereClause[] = EMPTY_WHERES;
-  private _groups: string[] | readonly string[] = EMPTY_STRINGS;
-  private _havings: WhereClause[] | readonly WhereClause[] = EMPTY_WHERES;
-  private _orders: string[] | readonly string[] = EMPTY_STRINGS;
+  private _joins: string[] = [];
+  private _wheres: WhereClause[] = [];
+  private _groups: string[] = [];
+  private _havings: WhereClause[] = [];
+  private _orders: string[] = [];
   private _limit: number | null = null;
   private _offset: number | null = null;
 
@@ -55,44 +45,37 @@ export class SelectBuilder {
   }
 
   join(tableRef: string, _alias: undefined, on: string): this {
-    if (this._joins === EMPTY_STRINGS) this._joins = [];
-    (this._joins as string[]).push(`INNER JOIN ${tableRef} ON (${on})`);
+    this._joins.push(`INNER JOIN ${tableRef} ON (${on})`);
     return this;
   }
 
   left_join(tableRef: string, _alias: undefined, on: string): this {
-    if (this._joins === EMPTY_STRINGS) this._joins = [];
-    (this._joins as string[]).push(`LEFT JOIN ${tableRef} ON (${on})`);
+    this._joins.push(`LEFT JOIN ${tableRef} ON (${on})`);
     return this;
   }
 
   right_join(tableRef: string, _alias: undefined, on: string): this {
-    if (this._joins === EMPTY_STRINGS) this._joins = [];
-    (this._joins as string[]).push(`RIGHT JOIN ${tableRef} ON (${on})`);
+    this._joins.push(`RIGHT JOIN ${tableRef} ON (${on})`);
     return this;
   }
 
   where(condition: string, ...values: unknown[]): this {
-    if (this._wheres === EMPTY_WHERES) this._wheres = [];
-    (this._wheres as WhereClause[]).push({ condition, values });
+    this._wheres.push({ condition, values });
     return this;
   }
 
   group(field: string): this {
-    if (this._groups === EMPTY_STRINGS) this._groups = [];
-    (this._groups as string[]).push(field);
+    this._groups.push(field);
     return this;
   }
 
   having(condition: string, ...values: unknown[]): this {
-    if (this._havings === EMPTY_WHERES) this._havings = [];
-    (this._havings as WhereClause[]).push({ condition, values });
+    this._havings.push({ condition, values });
     return this;
   }
 
   order(column: string, asc: boolean): this {
-    if (this._orders === EMPTY_STRINGS) this._orders = [];
-    (this._orders as string[]).push(`${column} ${asc ? 'ASC' : 'DESC'}`);
+    this._orders.push(`${column} ${asc ? 'ASC' : 'DESC'}`);
     return this;
   }
 
@@ -143,7 +126,7 @@ export class SelectBuilder {
 
     // JOINs
     for (let i = 0; i < this._joins.length; i++) {
-      sql += ' ' + this._joins[i];
+      sql += ` ${this._joins[i]}`;
     }
 
     // WHERE — build inline to avoid intermediate array + join
@@ -186,10 +169,10 @@ export class SelectBuilder {
 
     // LIMIT / OFFSET
     if (this._limit !== null) {
-      sql += ' LIMIT ' + this._limit;
+      sql += ` LIMIT ${this._limit}`;
     }
     if (this._offset !== null) {
-      sql += ' OFFSET ' + this._offset;
+      sql += ` OFFSET ${this._offset}`;
     }
 
     return { text: sql, values: allValues };
@@ -211,6 +194,11 @@ export class SelectBuilder {
     }
     return result;
   }
+}
+
+interface WhereClause {
+  condition: string;
+  values: unknown[];
 }
 
 /**
