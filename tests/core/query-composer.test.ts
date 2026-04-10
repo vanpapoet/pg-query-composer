@@ -106,11 +106,12 @@ describe('QueryComposer', () => {
   });
 
   describe('not()', () => {
-    it('adds NOT conditions', () => {
+    it('adds negated conditions using inverted operators', () => {
       const qc = new QueryComposer(TestSchema, 'users', { strict: false });
       qc.not({ status: 'deleted' });
       const { text } = qc.toParam();
-      expect(text).toContain('NOT');
+      // exact negates to notexact (!=) instead of NOT (status = $1)
+      expect(text).toContain('!=');
     });
   });
 

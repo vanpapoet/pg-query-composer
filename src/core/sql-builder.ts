@@ -13,10 +13,7 @@ export interface ParamResult {
 }
 
 /**
- * Replace ? placeholders with $N — extracted to module level to avoid closure allocation per toParam()
- */
-/**
- * Replace ? placeholders with $N. Uses number array [idx] for fast mutable counter.
+ * Replace ? placeholders with $N. Module-level to avoid closure allocation.
  */
 function replaceParams(
   clause: string,

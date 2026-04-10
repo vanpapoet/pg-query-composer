@@ -57,7 +57,8 @@ describe('merge()', () => {
     const merged = merge(qc1, qc2);
     const { text, values } = merged.toParam();
 
-    expect(text).toContain('NOT');
+    // NOT conditions use inverted operators (exact → notexact → !=)
+    expect(text).toContain('!=');
     expect(values).toContain('deleted');
     expect(values).toContain(18);
   });
