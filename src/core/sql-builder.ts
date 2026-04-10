@@ -96,14 +96,20 @@ export class SelectBuilder {
     const allValues: unknown[] = [];
     let paramIndex = 0;
 
-    // Replace ? placeholders with $N in a clause, collecting values
+    // Replace ? placeholders with $N without regex
     const replaceParams = (clause: string, values: unknown[]): string => {
       let vi = 0;
-      return clause.replace(/\?/g, () => {
-        paramIndex++;
-        allValues.push(values[vi++]);
-        return `$${paramIndex}`;
-      });
+      let result = '';
+      let lastIdx = 0;
+      for (let i = 0; i < clause.length; i++) {
+        if (clause.charCodeAt(i) === 63) { // '?'
+          paramIndex++;
+          allValues.push(values[vi++]);
+          result += clause.slice(lastIdx, i) + '$' + paramIndex;
+          lastIdx = i + 1;
+        }
+      }
+      return lastIdx === 0 ? clause : result + clause.slice(lastIdx);
     };
 
     // SELECT
