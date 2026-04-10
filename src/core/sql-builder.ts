@@ -15,10 +15,13 @@ export interface ParamResult {
 /**
  * Replace ? placeholders with $N — extracted to module level to avoid closure allocation per toParam()
  */
+/**
+ * Replace ? placeholders with $N. Uses number array [idx] for fast mutable counter.
+ */
 function replaceParams(
   clause: string,
   values: unknown[],
-  state: { paramIndex: number },
+  pidx: number[],
   allValues: unknown[]
 ): string {
   let vi = 0;
@@ -26,9 +29,9 @@ function replaceParams(
   let lastIdx = 0;
   for (let i = 0; i < clause.length; i++) {
     if (clause.charCodeAt(i) === 63) { // '?'
-      state.paramIndex++;
+      pidx[0]++;
       allValues.push(values[vi++]);
-      result += clause.slice(lastIdx, i) + '$' + state.paramIndex;
+      result += clause.slice(lastIdx, i) + '$' + pidx[0];
       lastIdx = i + 1;
     }
   }
@@ -131,7 +134,7 @@ export class SelectBuilder {
    */
   toParam(): ParamResult {
     const allValues: unknown[] = [];
-    const state = { paramIndex: 0 };
+    const pidx = [0];
 
     // SELECT — build fields inline to avoid join
     let sql: string;
@@ -152,9 +155,9 @@ export class SelectBuilder {
 
     // WHERE — build inline using parallel arrays
     if (this._wConds.length > 0) {
-      let whereStr = '(' + replaceParams(this._wConds[0], this._wVals[0], state, allValues) + ')';
+      let whereStr = '(' + replaceParams(this._wConds[0], this._wVals[0], pidx, allValues) + ')';
       for (let i = 1; i < this._wConds.length; i++) {
-        whereStr += ' AND (' + replaceParams(this._wConds[i], this._wVals[i], state, allValues) + ')';
+        whereStr += ' AND (' + replaceParams(this._wConds[i], this._wVals[i], pidx, allValues) + ')';
       }
       sql += ' WHERE ' + whereStr;
     }
@@ -169,9 +172,9 @@ export class SelectBuilder {
 
     // HAVING — build inline using parallel arrays
     if (this._hConds.length > 0) {
-      let havingStr = '(' + replaceParams(this._hConds[0], this._hVals[0], state, allValues) + ')';
+      let havingStr = '(' + replaceParams(this._hConds[0], this._hVals[0], pidx, allValues) + ')';
       for (let i = 1; i < this._hConds.length; i++) {
-        havingStr += ' AND (' + replaceParams(this._hConds[i], this._hVals[i], state, allValues) + ')';
+        havingStr += ' AND (' + replaceParams(this._hConds[i], this._hVals[i], pidx, allValues) + ')';
       }
       sql += ' HAVING ' + havingStr;
     }
@@ -186,14 +189,14 @@ export class SelectBuilder {
 
     // LIMIT / OFFSET — parameterized for PG plan reuse
     if (this._limit !== null) {
-      state.paramIndex++;
+      pidx[0]++;
       allValues.push(this._limit);
-      sql += ' LIMIT $' + state.paramIndex;
+      sql += ' LIMIT $' + pidx[0];
     }
     if (this._offset !== null) {
-      state.paramIndex++;
+      pidx[0]++;
       allValues.push(this._offset);
-      sql += ' OFFSET $' + state.paramIndex;
+      sql += ' OFFSET $' + pidx[0];
     }
 
     return { text: sql, values: allValues };
