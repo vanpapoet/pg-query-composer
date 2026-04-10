@@ -154,6 +154,9 @@ export class QueryComposer {
    * Add WHERE conditions (AND logic)
    */
   where(filters: Record<string, unknown>): this {
+    const sep = this.options.separator;
+    const sepLen = sep.length;
+
     for (const key in filters) {
       const value = filters[key];
       if (value === undefined) continue;
@@ -165,7 +168,19 @@ export class QueryComposer {
       }
 
       try {
-        const { column, operator } = this.parseFieldOperator(key);
+        const sepIdx = key.indexOf(sep);
+        const column = sepIdx === -1 ? key : key.slice(0, sepIdx);
+        const operator = (sepIdx === -1 ? 'exact' : key.slice(sepIdx + sepLen)) as QueryOperator;
+
+        if (!this.whitelistSet.has(column)) {
+          if (this.options.strict) throw new InvalidColumnError(column, this.whitelist);
+          continue;
+        }
+        if (!VALID_OPERATORS_SET.has(operator)) {
+          if (this.options.strict) throw new InvalidOperatorError(operator);
+          continue;
+        }
+
         this.conditions.push({ column, operator, value });
       } catch (e) {
         if (this.options.strict) throw e;
