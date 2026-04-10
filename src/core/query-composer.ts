@@ -555,9 +555,14 @@ export class QueryComposer {
   toSelect(): SelectBuilder {
     let query = new SelectBuilder().from(this.table);
 
-    // Apply fields
-    const fields = this.getSelectFields();
-    query = query.fields(fields);
+    // Apply fields — use SELECT * when no explicit select/exclude (shorter SQL, faster PG parse)
+    if (this.selectedFields.length > 0) {
+      query = query.fields(this.selectedFields);
+    } else if (this.excludedFields && this.excludedFields.size > 0) {
+      const fields = this.whitelist.filter((f) => !this.excludedFields!.has(f)) as string[];
+      query = query.fields(fields);
+    }
+    // else: no fields() call → SelectBuilder uses SELECT *
 
     // Apply joins
     query = this.applyJoins(query);
