@@ -47,7 +47,7 @@ describe('subquery()', () => {
       .where({ name__contains: 'Liga' });
 
     const { text, values } = sq.toParam();
-    expect(text).toContain('name LIKE');
+    expect(text).toContain('name ILIKE');
     expect(values).toContain('%Liga%');
   });
 
