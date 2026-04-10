@@ -591,9 +591,98 @@ export class QueryComposer {
 
   /**
    * Get parameterized query for SELECT
+   * Fast path: builds SQL inline for common cases (no joins/groupBy/having)
    */
   toParam(): { text: string; values: unknown[] } {
+    // Fast path: bypass SelectBuilder when no joins, group by, or having
+    if (this.joins.length === 0 && this.groupByFields.length === 0 && this.havingConditions.length === 0) {
+      return this.toParamFast();
+    }
     return this.toSelect().toParam();
+  }
+
+  /**
+   * Inline SQL generation — avoids SelectBuilder allocation
+   */
+  private toParamFast(): { text: string; values: unknown[] } {
+    const allValues: unknown[] = [];
+    let paramIndex = 0;
+
+    // Replace ? placeholders with $N
+    const replaceParams = (clause: string, values: unknown[]): string => {
+      let vi = 0;
+      let result = '';
+      let lastIdx = 0;
+      for (let i = 0; i < clause.length; i++) {
+        if (clause.charCodeAt(i) === 63) { // '?'
+          paramIndex++;
+          allValues.push(values[vi++]);
+          result += clause.slice(lastIdx, i) + '$' + paramIndex;
+          lastIdx = i + 1;
+        }
+      }
+      return lastIdx === 0 ? clause : result + clause.slice(lastIdx);
+    };
+
+    // SELECT fields
+    const fields = this.getSelectFields();
+    let sql = 'SELECT ' + (fields.length > 0 ? fields.join(', ') : '*') + ' FROM ' + this.table;
+
+    // WHERE — AND conditions
+    const whereParts: string[] = [];
+    for (const cond of this.conditions) {
+      if (cond.raw && cond.rawCondition) {
+        whereParts.push(replaceParams(cond.rawCondition, cond.value as unknown[]));
+        continue;
+      }
+      const handler = OPERATORS[cond.operator];
+      const [condStr, values] = handler(cond.column, cond.value);
+      whereParts.push(replaceParams(condStr, values));
+    }
+
+    // WHERE — OR groups
+    for (const group of this.orGroups) {
+      const orParts: string[] = [];
+      const orValues: unknown[] = [];
+      for (const cond of group.conditions) {
+        const handler = OPERATORS[cond.operator];
+        const [condStr, values] = handler(cond.column, cond.value);
+        orParts.push(condStr);
+        orValues.push(...values);
+      }
+      if (orParts.length > 0) {
+        whereParts.push(replaceParams('(' + orParts.join(' OR ') + ')', orValues));
+      }
+    }
+
+    // WHERE — NOT conditions
+    for (const cond of this.notConditions) {
+      const handler = OPERATORS[cond.operator];
+      const [condStr, values] = handler(cond.column, cond.value);
+      whereParts.push(replaceParams('NOT (' + condStr + ')', values));
+    }
+
+    if (whereParts.length > 0) {
+      sql += ' WHERE (' + whereParts.join(') AND (') + ')';
+    }
+
+    // ORDER BY
+    if (this.sortOptions.length > 0) {
+      const orderParts: string[] = [];
+      for (const sort of this.sortOptions) {
+        orderParts.push(sort.column + (sort.direction === 'ASC' ? ' ASC' : ' DESC'));
+      }
+      sql += ' ORDER BY ' + orderParts.join(', ');
+    }
+
+    // LIMIT / OFFSET
+    if (this.paginationOptions) {
+      const { page, limit } = this.paginationOptions;
+      const offset = (page! - 1) * limit!;
+      sql += ' LIMIT ' + limit + ' OFFSET ' + offset;
+    }
+
+    return { text: sql, values: allValues };
   }
 
   /**
