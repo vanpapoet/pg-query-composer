@@ -111,3 +111,8 @@ export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
  * List of all valid operator names
  */
 export const VALID_OPERATORS = Object.keys(OPERATORS) as QueryOperator[];
+
+/**
+ * Set for O(1) operator validation lookups
+ */
+export const VALID_OPERATORS_SET: ReadonlySet<string> = new Set(VALID_OPERATORS);

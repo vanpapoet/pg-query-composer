@@ -1,7 +1,7 @@
 import squel from 'squel';
 import * as z from 'zod';
 import { extractZodColumns } from '../utils/zod-utils';
-import { OPERATORS, VALID_OPERATORS } from './operators';
+import { OPERATORS, VALID_OPERATORS_SET } from './operators';
 import { InvalidColumnError, InvalidOperatorError } from './errors';
 import type {
   QueryOperator,
@@ -34,6 +34,7 @@ export class QueryComposer {
   private table: string;
   private options: Required<QueryBuilderOptions>;
   private whitelist: readonly string[];
+  private whitelistSet: ReadonlySet<string>;
 
   private conditions: Condition[] = [];
   private orGroups: OrGroup[] = [];
@@ -75,6 +76,7 @@ export class QueryComposer {
       'updated_at',
       'deleted_at',
     ];
+    this.whitelistSet = new Set(this.whitelist);
   }
 
   // ===========================================================================
@@ -82,7 +84,7 @@ export class QueryComposer {
   // ===========================================================================
 
   private validateColumn(column: string): boolean {
-    const isValid = this.whitelist.includes(column);
+    const isValid = this.whitelistSet.has(column);
     if (!isValid && this.options.strict) {
       throw new InvalidColumnError(column, this.whitelist);
     }
@@ -90,7 +92,7 @@ export class QueryComposer {
   }
 
   private validateOperator(operator: string): operator is QueryOperator {
-    const isValid = VALID_OPERATORS.includes(operator as QueryOperator);
+    const isValid = VALID_OPERATORS_SET.has(operator);
     if (!isValid && this.options.strict) {
       throw new InvalidOperatorError(operator);
     }
@@ -248,7 +250,7 @@ export class QueryComposer {
    * Exclude specific fields from selection
    */
   exclude(fields: string[]): this {
-    this.excludedFields = fields.filter((f) => this.whitelist.includes(f));
+    this.excludedFields = fields.filter((f) => this.whitelistSet.has(f));
     return this;
   }
 
