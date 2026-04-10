@@ -21,11 +21,12 @@ export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
   lte: (col, val) => [col + ' <= ?', [val]],
 
   // ===== TEXT OPERATORS =====
-  contains: (col, val) => [col + ' ILIKE ?', ['%' + val + '%']],
+  // Case-sensitive variants use LIKE (can leverage B-tree indexes)
+  contains: (col, val) => [col + ' LIKE ?', ['%' + val + '%']],
   icontains: (col, val) => [col + ' ILIKE ?', ['%' + val + '%']],
-  startswith: (col, val) => [col + ' ILIKE ?', [val + '%']],
+  startswith: (col, val) => [col + ' LIKE ?', [val + '%']],
   istartswith: (col, val) => [col + ' ILIKE ?', [val + '%']],
-  endswith: (col, val) => [col + ' ILIKE ?', ['%' + val]],
+  endswith: (col, val) => [col + ' LIKE ?', ['%' + val]],
   iendswith: (col, val) => [col + ' ILIKE ?', ['%' + val]],
   regex: (col, val) => [col + ' ~ ?', [val]],
   iregex: (col, val) => [col + ' ~* ?', [val]],
