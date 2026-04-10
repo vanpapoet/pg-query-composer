@@ -41,21 +41,21 @@ describe('OPERATORS', () => {
   });
 
   describe('Text Operators', () => {
-    it('contains - generates ILIKE with wildcards', () => {
+    it('contains - generates case-sensitive LIKE with wildcards', () => {
       const [condition, values] = OPERATORS.contains('name', 'john');
-      expect(condition).toBe('name ILIKE ?');
+      expect(condition).toBe('name LIKE ?');
       expect(values).toEqual(['%john%']);
     });
 
-    it('startswith - generates ILIKE with suffix wildcard', () => {
+    it('startswith - generates case-sensitive LIKE with suffix wildcard', () => {
       const [condition, values] = OPERATORS.startswith('name', 'john');
-      expect(condition).toBe('name ILIKE ?');
+      expect(condition).toBe('name LIKE ?');
       expect(values).toEqual(['john%']);
     });
 
-    it('endswith - generates ILIKE with prefix wildcard', () => {
+    it('endswith - generates case-sensitive LIKE with prefix wildcard', () => {
       const [condition, values] = OPERATORS.endswith('email', '@gmail.com');
-      expect(condition).toBe('email ILIKE ?');
+      expect(condition).toBe('email LIKE ?');
       expect(values).toEqual(['%@gmail.com']);
     });
 

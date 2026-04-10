@@ -46,7 +46,7 @@ describe('QueryComposer', () => {
       const qc = new QueryComposer(TestSchema, 'users', { strict: false });
       qc.where({ 'name__contains': 'john' });
       const { text, values } = qc.toParam();
-      expect(text).toContain('name ILIKE $1');
+      expect(text).toContain('name LIKE $1');
       expect(values).toEqual(['%john%']);
     });
 
