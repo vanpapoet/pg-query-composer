@@ -458,16 +458,16 @@ export class QueryComposer {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private applyConditions(query: SelectBuilder): SelectBuilder {
-    // Apply AND conditions
+    // Apply AND conditions — use whereArr to avoid spread overhead
     for (const cond of this.conditions) {
       if (cond.raw && cond.rawCondition) {
-        query = query.where(cond.rawCondition, ...(cond.value as unknown[]));
+        query = query.whereArr(cond.rawCondition, cond.value as unknown[]);
         continue;
       }
 
       const handler = OPERATORS[cond.operator];
       const [condStr, values] = handler(cond.column, cond.value);
-      query = query.where(condStr, ...values);
+      query = query.whereArr(condStr, values);
     }
 
     // Apply OR groups
@@ -483,8 +483,8 @@ export class QueryComposer {
       }
 
       if (orConditions.length > 0) {
-        const orExpr = `(${orConditions.join(' OR ')})`;
-        query = query.where(orExpr, ...orValues);
+        const orExpr = '(' + orConditions.join(' OR ') + ')';
+        query = query.whereArr(orExpr, orValues);
       }
     }
 
@@ -492,7 +492,7 @@ export class QueryComposer {
     for (const cond of this.notConditions) {
       const handler = OPERATORS[cond.operator];
       const [condStr, values] = handler(cond.column, cond.value);
-      query = query.where(`NOT (${condStr})`, ...values);
+      query = query.whereArr('NOT (' + condStr + ')', values);
     }
 
     return query;
