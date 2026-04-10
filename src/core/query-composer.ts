@@ -39,6 +39,14 @@ function buildWhitelist(schema: z.ZodTypeAny, extraColumns: string[]): { list: r
   return result;
 }
 
+// Pre-built default options to avoid object allocation on common path
+const DEFAULT_OPTIONS: Required<QueryBuilderOptions> = {
+  strict: true,
+  separator: '__',
+  extraColumns: [],
+  aliases: {},
+};
+
 /**
  * Advanced SQL Query Composer
  *
@@ -76,16 +84,23 @@ export class QueryComposer {
   constructor(
     schema: z.ZodTypeAny,
     table: string,
-    options: QueryBuilderOptions = {}
+    options?: QueryBuilderOptions
   ) {
     this.schema = schema;
     this.table = table;
-    this.options = {
-      strict: options.strict ?? true,
-      separator: options.separator ?? '__',
-      extraColumns: options.extraColumns ?? [],
-      aliases: options.aliases ?? {},
-    };
+
+    // Use pre-built defaults when no options provided (common path)
+    if (!options || (options.strict === undefined && options.separator === undefined
+        && !options.extraColumns?.length && !Object.keys(options.aliases ?? {}).length)) {
+      this.options = DEFAULT_OPTIONS;
+    } else {
+      this.options = {
+        strict: options.strict ?? true,
+        separator: options.separator ?? '__',
+        extraColumns: options.extraColumns ?? [],
+        aliases: options.aliases ?? {},
+      };
+    }
 
     // Build whitelist from schema + extra columns (cached for common case)
     const wl = buildWhitelist(schema, this.options.extraColumns);
