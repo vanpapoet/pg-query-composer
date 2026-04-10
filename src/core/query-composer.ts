@@ -523,6 +523,11 @@ export class QueryComposer {
       return this.selectedFields;
     }
 
+    // When no exclusions, return whitelist directly (avoid filter allocation)
+    if (this.excludedFields.size === 0) {
+      return this.whitelist as string[];
+    }
+
     return this.whitelist.filter(
       (f) => !this.excludedFields.has(f)
     ) as string[];
