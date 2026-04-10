@@ -2,7 +2,7 @@ import * as z from 'zod';
 import { extractZodColumns } from '../utils/zod-utils';
 import { OPERATORS, VALID_OPERATORS_SET } from './operators';
 import { InvalidColumnError, InvalidOperatorError } from './errors';
-import { SelectBuilder, select } from './sql-builder';
+import { SelectBuilder } from './sql-builder';
 import type {
   QueryOperator,
   QueryBuilderOptions,
@@ -532,7 +532,7 @@ export class QueryComposer {
    * Build SELECT query
    */
   toSelect(): SelectBuilder {
-    let query = select().from(this.table);
+    let query = new SelectBuilder().from(this.table);
 
     // Apply fields
     const fields = this.getSelectFields();
@@ -573,7 +573,7 @@ export class QueryComposer {
    * Build COUNT query
    */
   toCount(): SelectBuilder {
-    let query = select().from(this.table).field('COUNT(*)', 'total');
+    let query = new SelectBuilder().from(this.table).field('COUNT(*)', 'total');
 
     query = this.applyJoins(query);
     query = this.applyConditions(query);
