@@ -553,7 +553,7 @@ export class QueryComposer {
    * Build SELECT query
    */
   toSelect(): SelectBuilder {
-    let query = new SelectBuilder().from(this.table);
+    let query = new SelectBuilder(this.table);
 
     // Apply fields — use SELECT * when no explicit select/exclude (shorter SQL, faster PG parse)
     if (this.selectedFields.length > 0) {
@@ -599,7 +599,7 @@ export class QueryComposer {
    * Build COUNT query
    */
   toCount(): SelectBuilder {
-    let query = new SelectBuilder().from(this.table).field('COUNT(*)', 'total');
+    let query = new SelectBuilder(this.table).field('COUNT(*)', 'total');
 
     query = this.applyJoins(query);
     query = this.applyConditions(query);
