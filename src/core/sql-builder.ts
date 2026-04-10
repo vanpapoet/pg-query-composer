@@ -112,9 +112,17 @@ export class SelectBuilder {
       return lastIdx === 0 ? clause : result + clause.slice(lastIdx);
     };
 
-    // SELECT
-    const fieldsPart = this._fields.length > 0 ? this._fields.join(', ') : '*';
-    let sql = `SELECT ${fieldsPart} FROM ${this._table}`;
+    // SELECT — build fields inline to avoid join
+    let sql: string;
+    if (this._fields.length > 0) {
+      sql = 'SELECT ' + this._fields[0];
+      for (let i = 1; i < this._fields.length; i++) {
+        sql += ', ' + this._fields[i];
+      }
+      sql += ' FROM ' + this._table;
+    } else {
+      sql = 'SELECT * FROM ' + this._table;
+    }
 
     // JOINs
     for (let i = 0; i < this._joins.length; i++) {
@@ -132,9 +140,12 @@ export class SelectBuilder {
       sql += ' WHERE ' + whereStr;
     }
 
-    // GROUP BY
+    // GROUP BY — build inline
     if (this._groups.length > 0) {
-      sql += ` GROUP BY ${this._groups.join(', ')}`;
+      sql += ' GROUP BY ' + this._groups[0];
+      for (let i = 1; i < this._groups.length; i++) {
+        sql += ', ' + this._groups[i];
+      }
     }
 
     // HAVING — build inline to avoid intermediate array + join
@@ -148,9 +159,12 @@ export class SelectBuilder {
       sql += ' HAVING ' + havingStr;
     }
 
-    // ORDER BY
+    // ORDER BY — build inline
     if (this._orders.length > 0) {
-      sql += ` ORDER BY ${this._orders.join(', ')}`;
+      sql += ' ORDER BY ' + this._orders[0];
+      for (let i = 1; i < this._orders.length; i++) {
+        sql += ', ' + this._orders[i];
+      }
     }
 
     // LIMIT / OFFSET
