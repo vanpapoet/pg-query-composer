@@ -564,13 +564,11 @@ export class QueryComposer {
     }
     // else: no fields() call → SelectBuilder uses SELECT *
 
-    // Apply joins (skip call when no joins)
-    if (this.joins.length > 0) query = this.applyJoins(query);
+    // Apply joins
+    query = this.applyJoins(query);
 
-    // Apply conditions (skip call when no conditions at all)
-    if (this.conditions.length > 0 || this.orGroups.length > 0 || this.notConditions.length > 0) {
-      query = this.applyConditions(query);
-    }
+    // Apply conditions
+    query = this.applyConditions(query);
 
     // Apply GROUP BY
     for (const field of this.groupByFields) {
