@@ -41,7 +41,7 @@ function replaceParams(
  * Uses parallel arrays instead of object arrays to minimize allocations.
  */
 export class SelectBuilder {
-  private _table = '';
+  private _table: string;
   private _fields: string[] = [];
   private _joins: string[] = [];
   // Parallel arrays for WHERE clauses — avoids per-clause object allocation
@@ -54,6 +54,10 @@ export class SelectBuilder {
   private _orders: string[] = [];
   private _limit: number | null = null;
   private _offset: number | null = null;
+
+  constructor(table = '') {
+    this._table = table;
+  }
 
   from(table: string): this {
     this._table = table;
