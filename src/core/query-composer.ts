@@ -72,7 +72,7 @@ export class QueryComposer {
   private sortOptions: SortOption[] = [];
   private paginationOptions: PaginationOptions | null = null;
   private selectedFields: string[] = [];
-  private excludedFields: Set<string> | null = null;
+  private excludedFields: Set<string> = new Set();
 
   private joins: JoinConfig[] = [];
   private groupByFields: string[] = [];
@@ -523,12 +523,8 @@ export class QueryComposer {
       return this.selectedFields;
     }
 
-    if (!this.excludedFields) {
-      return this.whitelist as string[];
-    }
-
     return this.whitelist.filter(
-      (f) => !this.excludedFields!.has(f)
+      (f) => !this.excludedFields.has(f)
     ) as string[];
   }
 
@@ -627,7 +623,7 @@ export class QueryComposer {
       ? { ...this.paginationOptions }
       : null;
     cloned.selectedFields = [...this.selectedFields];
-    cloned.excludedFields = this.excludedFields ? new Set(this.excludedFields) : null;
+    cloned.excludedFields = new Set(this.excludedFields);
     cloned.joins = [...this.joins];
     cloned.groupByFields = [...this.groupByFields];
     cloned.havingConditions = [...this.havingConditions];
@@ -644,7 +640,7 @@ export class QueryComposer {
     this.sortOptions = [];
     this.paginationOptions = null;
     this.selectedFields = [];
-    this.excludedFields = null;
+    this.excludedFields = new Set();
     this.joins = [];
     this.groupByFields = [];
     this.havingConditions = [];
