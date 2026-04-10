@@ -38,9 +38,7 @@ export class SelectBuilder {
   }
 
   fields(fieldList: string[]): this {
-    for (let i = 0; i < fieldList.length; i++) {
-      this._fields.push(fieldList[i]);
-    }
+    this._fields = fieldList;
     return this;
   }
 
