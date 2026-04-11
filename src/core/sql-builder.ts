@@ -5,11 +5,25 @@
  */
 
 /**
- * Result of a parameterized query build
+ * Result of a parameterized query build.
+ * Includes optional `name` for PG prepared statement caching.
  */
 export interface ParamResult {
   text: string;
   values: unknown[];
+  name: string;
+}
+
+/**
+ * Fast hash for generating stable prepared statement names.
+ * djb2 algorithm — fast, low-collision for SQL strings.
+ */
+function quickHash(str: string): string {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  }
+  return 'qc_' + (h >>> 0).toString(36);
 }
 
 /**
@@ -196,7 +210,7 @@ export class SelectBuilder {
       sql += ' OFFSET $' + pidx[0];
     }
 
-    return { text: sql, values: allValues };
+    return { text: sql, values: allValues, name: quickHash(sql) };
   }
 
   /**
