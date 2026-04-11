@@ -1,69 +1,69 @@
 {
-  "timestamp": "2026-04-11T02:38:16.682Z",
-  "totalMs": 20.63,
+  "timestamp": "2026-04-11T02:48:29.549Z",
+  "totalMs": 15.17,
   "iterations": 500,
   "runs": 5,
-  "heapUsedMB": 0.89,
+  "heapUsedMB": -0.84,
   "cases": [
     {
       "name": "simple-where",
-      "ms": 2.32,
-      "opsPerSec": 215209
+      "ms": 2.42,
+      "opsPerSec": 206784
     },
     {
       "name": "multi-conditions",
-      "ms": 3.69,
-      "opsPerSec": 135592
+      "ms": 2.33,
+      "opsPerSec": 214871
     },
     {
       "name": "or-conditions",
-      "ms": 1.72,
-      "opsPerSec": 290940
+      "ms": 1.28,
+      "opsPerSec": 391778
     },
     {
       "name": "pagination",
-      "ms": 1.06,
-      "opsPerSec": 470111
+      "ms": 0.69,
+      "opsPerSec": 728214
     },
     {
       "name": "sorting",
-      "ms": 0.81,
-      "opsPerSec": 619885
+      "ms": 0.62,
+      "opsPerSec": 802316
     },
     {
       "name": "select-fields",
-      "ms": 0.68,
-      "opsPerSec": 732756
+      "ms": 0.61,
+      "opsPerSec": 816884
     },
     {
       "name": "not-conditions",
-      "ms": 0.88,
-      "opsPerSec": 569847
+      "ms": 0.76,
+      "opsPerSec": 654475
     },
     {
       "name": "join",
-      "ms": 0.62,
-      "opsPerSec": 808546
+      "ms": 0.44,
+      "opsPerSec": 1136109
     },
     {
       "name": "group-by-having",
-      "ms": 0.71,
-      "opsPerSec": 701894
+      "ms": 0.46,
+      "opsPerSec": 1085394
     },
     {
       "name": "complex-composite",
-      "ms": 2.65,
-      "opsPerSec": 188743
+      "ms": 2.01,
+      "opsPerSec": 248466
     },
     {
       "name": "in-list-large",
-      "ms": 3.7,
-      "opsPerSec": 135086
+      "ms": 2.13,
+      "opsPerSec": 234563
     },
     {
       "name": "deep-chain",
-      "ms": 1.79,
-      "opsPerSec": 278907
+      "ms": 1.42,
+      "opsPerSec": 351378
     }
   ]
 }
