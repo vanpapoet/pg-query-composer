@@ -13,22 +13,43 @@ export interface ParamResult {
 }
 
 /**
+ * Mutable parameter index counter — avoids array allocation for pass-by-ref.
+ */
+interface PIdx { v: number }
+
+/**
  * Replace ? placeholders with $N. Module-level to avoid closure allocation.
+ * Fast-paths for 0 and 1 value (covers ~80% of operator calls).
  */
 function replaceParams(
   clause: string,
   values: unknown[],
-  pidx: number[],
+  pidx: PIdx,
   allValues: unknown[]
 ): string {
+  const vlen = values.length;
+
+  // Fast path: no parameters (isnull, today, thisweek, etc.)
+  if (vlen === 0) return clause;
+
+  // Fast path: single parameter (exact, gt, gte, lt, lte, contains, etc.)
+  if (vlen === 1) {
+    const qIdx = clause.indexOf('?');
+    if (qIdx === -1) return clause;
+    pidx.v++;
+    allValues.push(values[0]);
+    return clause.slice(0, qIdx) + '$' + pidx.v + clause.slice(qIdx + 1);
+  }
+
+  // General path: multiple parameters
   let vi = 0;
   let result = '';
   let lastIdx = 0;
   for (let i = 0; i < clause.length; i++) {
     if (clause.charCodeAt(i) === 63) { // '?'
-      pidx[0]++;
+      pidx.v++;
       allValues.push(values[vi++]);
-      result += clause.slice(lastIdx, i) + '$' + pidx[0];
+      result += clause.slice(lastIdx, i) + '$' + pidx.v;
       lastIdx = i + 1;
     }
   }
@@ -131,7 +152,7 @@ export class SelectBuilder {
    */
   toParam(): ParamResult {
     const allValues: unknown[] = [];
-    const pidx = [0];
+    const pidx: PIdx = { v: 0 };
 
     // SELECT — build fields inline to avoid join
     let sql: string;
@@ -186,14 +207,14 @@ export class SelectBuilder {
 
     // LIMIT / OFFSET — parameterized for PG plan reuse
     if (this._limit !== null) {
-      pidx[0]++;
+      pidx.v++;
       allValues.push(this._limit);
-      sql += ' LIMIT $' + pidx[0];
+      sql += ' LIMIT $' + pidx.v;
     }
     if (this._offset !== null) {
-      pidx[0]++;
+      pidx.v++;
       allValues.push(this._offset);
-      sql += ' OFFSET $' + pidx[0];
+      sql += ' OFFSET $' + pidx.v;
     }
 
     return { text: sql, values: allValues };
