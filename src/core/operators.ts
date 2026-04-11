@@ -9,6 +9,20 @@ export type OperatorHandler = (
 ) => [string, unknown[]];
 
 /**
+ * Build comma-separated '?' placeholders for N values.
+ * Uses loop instead of arr.map(() => '?').join(', ') to avoid
+ * intermediate array allocation on hot path.
+ */
+function placeholders(n: number): string {
+  if (n === 1) return '?';
+  if (n === 2) return '?, ?';
+  if (n === 3) return '?, ?, ?';
+  let s = '?';
+  for (let i = 1; i < n; i++) s += ', ?';
+  return s;
+}
+
+/**
  * Built-in operator handlers
  */
 export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
@@ -34,14 +48,12 @@ export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
   in: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
     if (arr.length === 0) return ['FALSE', []];
-    const placeholders = arr.map(() => '?').join(', ');
-    return [col + ' IN (' + placeholders + ')', arr];
+    return [col + ' IN (' + placeholders(arr.length) + ')', arr];
   },
   notin: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
     if (arr.length === 0) return ['TRUE', []];
-    const placeholders = arr.map(() => '?').join(', ');
-    return [col + ' NOT IN (' + placeholders + ')', arr];
+    return [col + ' NOT IN (' + placeholders(arr.length) + ')', arr];
   },
   between: (col, val) => {
     const arr = Array.isArray(val) ? val : [];
@@ -92,18 +104,15 @@ export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
   // ===== ARRAY OPERATORS (PostgreSQL) =====
   arraycontains: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
-    const placeholders = arr.map(() => '?').join(', ');
-    return [col + ' @> ARRAY[' + placeholders + ']', arr];
+    return [col + ' @> ARRAY[' + placeholders(arr.length) + ']', arr];
   },
   arrayoverlap: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
-    const placeholders = arr.map(() => '?').join(', ');
-    return [col + ' && ARRAY[' + placeholders + ']', arr];
+    return [col + ' && ARRAY[' + placeholders(arr.length) + ']', arr];
   },
   arraycontained: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
-    const placeholders = arr.map(() => '?').join(', ');
-    return [col + ' <@ ARRAY[' + placeholders + ']', arr];
+    return [col + ' <@ ARRAY[' + placeholders(arr.length) + ']', arr];
   },
 };
 
