@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: bench
+      POSTGRES_PASSWORD: bench
+      POSTGRES_DB: bench
+    ports:
+      - "5499:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    command: >
+      postgres
+        -c shared_buffers=256MB
+        -c work_mem=64MB
+        -c maintenance_work_mem=128MB
+        -c max_connections=20
+        -c fsync=off
+        -c synchronous_commit=off
+        -c full_page_writes=off

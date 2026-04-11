@@ -90,6 +90,14 @@ We keep all important docs in `./docs` folder and keep updating them, structure 
 └── project-roadmap.md
 ```
 
+## Performance & Benchmarks
+
+- **Guard**: `npx vitest run tests/core tests/composition tests/subquery tests/relations tests/pg tests/types tests/integration` (203 tests)
+- **JS benchmark**: `npx tsx benchmarks/benchmark-runner.ts` (--baseline to save, --save for snapshot)
+- **PG benchmark**: `docker-compose up -d && npx tsx benchmarks/pg-execution-benchmark.ts` (requires PG on port 5499)
+- **Inline toParam() does NOT help** — V8 optimizes SelectBuilder's separate methods better; confirmed twice, do not retry
+- **PG pool deadlock**: never `pool.connect()` then `pool.query()` on same `max:1` pool — use separate pools for setup vs benchmark
+
 ## MCP & Context Optimization
 
 **Priority Tooling:** Always prioritize `serena` MCP server (`.claude/.mcp.json`) over manual file reads.

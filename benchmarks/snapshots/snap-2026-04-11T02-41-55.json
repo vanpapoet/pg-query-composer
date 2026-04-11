@@ -1,0 +1,69 @@
+{
+  "timestamp": "2026-04-11T02:41:55.621Z",
+  "totalMs": 26.03,
+  "iterations": 500,
+  "runs": 5,
+  "heapUsedMB": 0.85,
+  "cases": [
+    {
+      "name": "simple-where",
+      "ms": 4.65,
+      "opsPerSec": 107588
+    },
+    {
+      "name": "multi-conditions",
+      "ms": 5.29,
+      "opsPerSec": 94438
+    },
+    {
+      "name": "or-conditions",
+      "ms": 2.27,
+      "opsPerSec": 220637
+    },
+    {
+      "name": "pagination",
+      "ms": 1.25,
+      "opsPerSec": 400294
+    },
+    {
+      "name": "sorting",
+      "ms": 1.07,
+      "opsPerSec": 466565
+    },
+    {
+      "name": "select-fields",
+      "ms": 0.89,
+      "opsPerSec": 560892
+    },
+    {
+      "name": "not-conditions",
+      "ms": 1.24,
+      "opsPerSec": 403524
+    },
+    {
+      "name": "join",
+      "ms": 0.54,
+      "opsPerSec": 929352
+    },
+    {
+      "name": "group-by-having",
+      "ms": 0.61,
+      "opsPerSec": 818306
+    },
+    {
+      "name": "complex-composite",
+      "ms": 3.28,
+      "opsPerSec": 152600
+    },
+    {
+      "name": "in-list-large",
+      "ms": 3.13,
+      "opsPerSec": 159524
+    },
+    {
+      "name": "deep-chain",
+      "ms": 1.81,
+      "opsPerSec": 276270
+    }
+  ]
+}
