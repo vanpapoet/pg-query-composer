@@ -1,8 +1,11 @@
 /**
  * Realistic PostgreSQL Execution Benchmark
- * Connects to Docker PostgreSQL, creates schema with data,
+ * Connects to Docker PostgreSQL, creates schema with realistic data,
  * runs queries built by pg-query-composer, measures total execution time.
- * Output: single number (ms) on last line — lower is better.
+ * Output: per-case breakdown + single total number (ms) on last line.
+ *
+ * Schema: users (50K), orders (100K), products (10K), tags (500),
+ *         product_tags (40K) — covers 1-n, n-n relationships
  *
  * Requires: docker-compose up -d
  * Connection: postgresql://bench:bench@localhost:5499/bench
@@ -48,10 +51,16 @@ const productSchema = z.object({
   description: z.string(),
 });
 
+const tagSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  slug: z.string(),
+});
+
 // --- Setup ---
 async function setupSchema(pool: Pool) {
   await pool.query(`
-    DROP TABLE IF EXISTS orders, products, users CASCADE;
+    DROP TABLE IF EXISTS product_tags, orders, products, tags, users CASCADE;
 
     CREATE TABLE users (
       id SERIAL PRIMARY KEY,
@@ -87,6 +96,20 @@ async function setupSchema(pool: Pool) {
       deleted_at TIMESTAMP
     );
 
+    CREATE TABLE tags (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      slug VARCHAR(100) NOT NULL UNIQUE,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
+    CREATE TABLE product_tags (
+      product_id INTEGER REFERENCES products(id),
+      tag_id INTEGER REFERENCES tags(id),
+      PRIMARY KEY (product_id, tag_id)
+    );
+
+    -- Single-column indexes
     CREATE INDEX idx_users_status ON users(status);
     CREATE INDEX idx_users_age ON users(age);
     CREATE INDEX idx_users_email ON users(email);
@@ -95,67 +118,93 @@ async function setupSchema(pool: Pool) {
     CREATE INDEX idx_products_category ON products(category);
     CREATE INDEX idx_products_stock ON products(stock);
     CREATE INDEX idx_products_price ON products(price);
+
+    -- Composite indexes for common query patterns
+    CREATE INDEX idx_users_status_age ON users(status, age);
+    CREATE INDEX idx_orders_user_status ON orders(user_id, status);
+    CREATE INDEX idx_orders_status_created ON orders(status, created_at DESC);
+    CREATE INDEX idx_products_cat_price ON products(category, price);
   `);
 }
 
 async function seedData(pool: Pool) {
   const statuses = ['active', 'inactive', 'banned', 'premium'];
-  const categories = ['electronics', 'clothing', 'books', 'food', 'toys'];
+  const categories = ['electronics', 'clothing', 'books', 'food', 'toys', 'sports', 'beauty', 'home'];
   const orderStatuses = ['pending', 'completed', 'cancelled', 'refunded'];
 
-  // Seed 10k users
-  const userValues: string[] = [];
-  for (let i = 1; i <= 10000; i++) {
-    const status = statuses[i % statuses.length];
-    const age = 18 + (i % 50);
-    userValues.push(
-      `('user${i}@example.com', 'User ${i}', '${status}', ${age}, NOW() - INTERVAL '${i} hours')`
-    );
-  }
-  // Insert in batches of 2000
-  for (let i = 0; i < userValues.length; i += 2000) {
-    const batch = userValues.slice(i, i + 2000);
+  // Seed 50K users
+  for (let batch = 0; batch < 25; batch++) {
+    const values: string[] = [];
+    for (let i = 0; i < 2000; i++) {
+      const n = batch * 2000 + i + 1;
+      const status = statuses[n % statuses.length];
+      const age = 18 + (n % 50);
+      values.push(
+        `('user${n}@example.com', 'User ${n}', '${status}', ${age}, NOW() - INTERVAL '${n} hours')`
+      );
+    }
     await pool.query(
-      `INSERT INTO users (email, name, status, age, created_at) VALUES ${batch.join(',')}`
+      `INSERT INTO users (email, name, status, age, created_at) VALUES ${values.join(',')}`
     );
   }
 
-  // Seed 50k orders
-  const orderValues: string[] = [];
-  for (let i = 1; i <= 50000; i++) {
-    const userId = (i % 10000) + 1;
-    const status = orderStatuses[i % orderStatuses.length];
-    const total = (10 + (i % 990)).toFixed(2);
-    orderValues.push(
-      `(${userId}, ${total}, '${status}', NOW() - INTERVAL '${i} minutes', 'Order note ${i}')`
-    );
-  }
-  for (let i = 0; i < orderValues.length; i += 2000) {
-    const batch = orderValues.slice(i, i + 2000);
+  // Seed 100K orders
+  for (let batch = 0; batch < 50; batch++) {
+    const values: string[] = [];
+    for (let i = 0; i < 2000; i++) {
+      const n = batch * 2000 + i + 1;
+      const userId = (n % 50000) + 1;
+      const status = orderStatuses[n % orderStatuses.length];
+      const total = (10 + (n % 990)).toFixed(2);
+      values.push(
+        `(${userId}, ${total}, '${status}', NOW() - INTERVAL '${n} minutes', 'Note ${n}')`
+      );
+    }
     await pool.query(
-      `INSERT INTO orders (user_id, total, status, created_at, notes) VALUES ${batch.join(',')}`
+      `INSERT INTO orders (user_id, total, status, created_at, notes) VALUES ${values.join(',')}`
     );
   }
 
-  // Seed 5k products
-  const productValues: string[] = [];
-  for (let i = 1; i <= 5000; i++) {
-    const category = categories[i % categories.length];
-    const price = (5 + (i % 495)).toFixed(2);
-    const stock = i % 200;
-    productValues.push(
-      `('Product ${i}', ${price}, '${category}', ${stock}, 'Description for product ${i}')`
-    );
-  }
-  for (let i = 0; i < productValues.length; i += 2000) {
-    const batch = productValues.slice(i, i + 2000);
+  // Seed 10K products
+  for (let batch = 0; batch < 5; batch++) {
+    const values: string[] = [];
+    for (let i = 0; i < 2000; i++) {
+      const n = batch * 2000 + i + 1;
+      const category = categories[n % categories.length];
+      const price = (5 + (n % 495)).toFixed(2);
+      const stock = n % 200;
+      values.push(
+        `('Product ${n}', ${price}, '${category}', ${stock}, 'Desc ${n}')`
+      );
+    }
     await pool.query(
-      `INSERT INTO products (name, price, category, stock, description) VALUES ${batch.join(',')}`
+      `INSERT INTO products (name, price, category, stock, description) VALUES ${values.join(',')}`
     );
   }
 
-  // Analyze for query planner
-  await pool.query('ANALYZE users; ANALYZE orders; ANALYZE products;');
+  // Seed 500 tags
+  const tagValues: string[] = [];
+  for (let i = 1; i <= 500; i++) {
+    tagValues.push(`('Tag ${i}', 'tag-${i}')`);
+  }
+  await pool.query(`INSERT INTO tags (name, slug) VALUES ${tagValues.join(',')}`);
+
+  // Seed 40K product_tags (n-n)
+  for (let batch = 0; batch < 20; batch++) {
+    const values: string[] = [];
+    for (let i = 0; i < 2000; i++) {
+      const n = batch * 2000 + i;
+      const productId = (n % 10000) + 1;
+      const tagId = (n % 500) + 1;
+      values.push(`(${productId}, ${tagId})`);
+    }
+    await pool.query(
+      `INSERT INTO product_tags (product_id, tag_id) VALUES ${values.join(',')} ON CONFLICT DO NOTHING`
+    );
+  }
+
+  // Analyze all tables for query planner
+  await pool.query('ANALYZE users; ANALYZE orders; ANALYZE products; ANALYZE tags; ANALYZE product_tags;');
 }
 
 // --- Benchmark queries ---
@@ -165,11 +214,13 @@ type BenchCase = {
 };
 
 const benchCases: BenchCase[] = [
+  // --- Simple queries (all paginated to bound result size) ---
   {
     name: 'simple-where',
     build: () =>
       createQueryComposer(userSchema, 'users')
         .where({ status__exact: 'active' })
+        .paginate({ page: 1, limit: 50 })
         .toParam(),
   },
   {
@@ -182,6 +233,7 @@ const benchCases: BenchCase[] = [
           email__contains: 'example.com',
           name__startswith: 'User 1',
         })
+        .paginate({ page: 1, limit: 50 })
         .toParam(),
   },
   {
@@ -190,8 +242,11 @@ const benchCases: BenchCase[] = [
       createQueryComposer(userSchema, 'users')
         .where({ status__exact: 'active' })
         .or([{ age__gte: 21 }, { status__exact: 'premium' }])
+        .paginate({ page: 1, limit: 50 })
         .toParam(),
   },
+
+  // --- Pagination & sorting ---
   {
     name: 'pagination',
     build: () =>
@@ -202,31 +257,18 @@ const benchCases: BenchCase[] = [
         .toParam(),
   },
   {
-    name: 'sorting',
+    name: 'high-offset-pagination',
     build: () =>
-      createQueryComposer(productSchema, 'products')
-        .where({ stock__gt: 0 })
-        .orderBy('-price')
-        .orderBy('name')
+      createQueryComposer(orderSchema, 'orders')
+        .where({ status__exact: 'completed' })
+        .orderBy('-created_at')
+        .paginate({ page: 100, limit: 25 })
         .toParam(),
   },
+
+  // --- Joins ---
   {
-    name: 'select-fields',
-    build: () =>
-      createQueryComposer(userSchema, 'users')
-        .select(['id', 'name', 'email'])
-        .where({ status__exact: 'active' })
-        .toParam(),
-  },
-  {
-    name: 'not-conditions',
-    build: () =>
-      createQueryComposer(userSchema, 'users')
-        .not({ status__exact: 'banned', age__lt: 13 })
-        .toParam(),
-  },
-  {
-    name: 'join-query',
+    name: 'inner-join',
     build: () =>
       createQueryComposer(orderSchema, 'orders', { extraColumns: ['orders.id', 'orders.status', 'orders.created_at'] })
         .select(['orders.id', 'user_id', 'total', 'orders.status'])
@@ -237,13 +279,84 @@ const benchCases: BenchCase[] = [
         .toParam(),
   },
   {
-    name: 'group-by-having',
+    name: 'left-join',
+    build: () =>
+      createQueryComposer(userSchema, 'users', { extraColumns: ['users.id', 'users.name', 'users.status'] })
+        .select(['users.id', 'users.name'])
+        .leftJoin('orders', 'orders.user_id = users.id')
+        .where({ 'users.status__exact': 'premium' })
+        .paginate({ page: 1, limit: 50 })
+        .toParam(),
+  },
+  {
+    name: 'multi-join',
+    build: () =>
+      createQueryComposer(productSchema, 'products', {
+        extraColumns: ['products.id', 'products.name', 'products.price'],
+      })
+        .select(['products.id', 'products.name', 'products.price'])
+        .join('product_tags pt', 'pt.product_id = products.id')
+        .join('tags t', 't.id = pt.tag_id')
+        .where({ category__exact: 'electronics' })
+        .paginate({ page: 1, limit: 20 })
+        .toParam(),
+  },
+
+  // --- Aggregation ---
+  {
+    name: 'count-aggregate',
+    build: () =>
+      createQueryComposer(orderSchema, 'orders')
+        .select(['status'])
+        .groupBy('status')
+        .paginate({ page: 1, limit: 10 })
+        .toParam(),
+  },
+  {
+    name: 'sum-having',
     build: () =>
       createQueryComposer(orderSchema, 'orders')
         .select(['user_id'])
         .groupBy('user_id')
-        .having('SUM(total) > ?', [1000])
+        .having('SUM(total) > ?', [5000])
+        .paginate({ page: 1, limit: 50 })
         .toParam(),
+  },
+  {
+    name: 'avg-group-by',
+    build: () =>
+      createQueryComposer(productSchema, 'products')
+        .select(['category'])
+        .groupBy('category')
+        .having('AVG(price) > ?', [100])
+        .orderBy('category')
+        .paginate({ page: 1, limit: 20 })
+        .toParam(),
+  },
+
+  // --- Complex / mixed ---
+  {
+    name: 'nested-and-or',
+    build: () =>
+      createQueryComposer(userSchema, 'users')
+        .where({ status__exact: 'active', age__gte: 18 })
+        .or([
+          { age__between: [25, 35] },
+          { email__contains: 'premium' },
+        ])
+        .not({ name__isnull: true })
+        .paginate({ page: 1, limit: 50 })
+        .toParam(),
+  },
+  {
+    name: 'large-in-list',
+    build: () => {
+      const ids = Array.from({ length: 100 }, (_, i) => i + 1);
+      return createQueryComposer(userSchema, 'users')
+        .where({ id__in: ids })
+        .paginate({ page: 1, limit: 50 })
+        .toParam();
+    },
   },
   {
     name: 'complex-composite',
@@ -262,17 +375,25 @@ const benchCases: BenchCase[] = [
         .paginate({ page: 1, limit: 50 })
         .toParam(),
   },
+  {
+    name: 'not-conditions',
+    build: () =>
+      createQueryComposer(userSchema, 'users')
+        .not({ status__exact: 'banned', age__lt: 13 })
+        .paginate({ page: 1, limit: 50 })
+        .toParam(),
+  },
 ];
 
-const ITERATIONS = 100; // queries per case (actual DB round-trips)
-const RUNS = 11; // total benchmark runs (odd for clean median)
-const WARMUP_PASSES = 5; // warmup passes before measuring (PG plan caching needs 5+)
-const TRIM = 2; // discard top/bottom N runs before averaging (trimmed mean)
+const ITERATIONS = 20;  // queries per case (actual DB round-trips)
+const RUNS = 5;         // total benchmark runs (odd for clean median)
+const WARMUP_PASSES = 3; // warmup passes for PG plan caching
+const TRIM = 1;         // discard top/bottom N runs
 
-async function runBenchmark(client: import('pg').PoolClient): Promise<number> {
+async function runBenchmark(client: import('pg').PoolClient): Promise<{ total: number; cases: { name: string; ms: number }[] }> {
   let totalMs = 0;
+  const cases: { name: string; ms: number }[] = [];
 
-  // Measure: build + execute
   for (const bc of benchCases) {
     const start = performance.now();
     for (let i = 0; i < ITERATIONS; i++) {
@@ -281,46 +402,78 @@ async function runBenchmark(client: import('pg').PoolClient): Promise<number> {
     }
     const elapsed = performance.now() - start;
     totalMs += elapsed;
+    cases.push({ name: bc.name, ms: elapsed });
   }
 
-  return totalMs;
+  return { total: totalMs, cases };
 }
 
 async function main() {
-  const pool = new Pool({ ...CONNECTION, max: 1 }); // single connection for consistent plan caching
+  // Setup phase: use separate pool for DDL + seeding
+  const setupPool = new Pool({ ...CONNECTION, max: 2 });
+  console.log('Setting up schema...');
+  await setupSchema(setupPool);
+  console.log('Seeding data (50K users, 100K orders, 10K products, 500 tags, 40K product_tags)...');
+  await seedData(setupPool);
+  await setupPool.end();
+  console.log('Seed complete. Running warmup...');
+
+  // Benchmark phase: single connection for consistent plan caching
+  const pool = new Pool({ ...CONNECTION, max: 1 });
 
   try {
-    // Test connection + get dedicated client
     const client = await pool.connect();
 
-    // Setup
-    await client.query('SELECT 1');
-    await setupSchema(pool);
-    await seedData(pool);
-
-    // Warmup: run multiple passes so PG caches query plans
+    // Warmup
     for (let w = 0; w < WARMUP_PASSES; w++) {
       for (const bc of benchCases) {
         const q = bc.build();
         await client.query(q.text, q.values);
       }
+      console.log(`  warmup pass ${w + 1}/${WARMUP_PASSES} done`);
     }
 
-    // Run benchmark RUNS times
-    const results: number[] = [];
+    // Run benchmark
+    const allResults: number[] = [];
+    const caseAccum = new Map<string, number[]>();
+
+    console.log(`Running ${RUNS} benchmark passes...`);
     for (let run = 0; run < RUNS; run++) {
-      const ms = await runBenchmark(client);
-      results.push(ms);
+      const result = await runBenchmark(client);
+      allResults.push(result.total);
+      console.log(`  run ${run + 1}/${RUNS}: ${result.total.toFixed(0)}ms`);
+      for (const c of result.cases) {
+        if (!caseAccum.has(c.name)) caseAccum.set(c.name, []);
+        caseAccum.get(c.name)!.push(c.ms);
+      }
     }
     client.release();
 
-    // Trimmed mean: discard top/bottom TRIM, average the rest
-    results.sort((a, b) => a - b);
-    const trimmed = results.slice(TRIM, results.length - TRIM);
-    const mean = trimmed.reduce((sum, v) => sum + v, 0) / trimmed.length;
+    // Trimmed mean for total
+    allResults.sort((a, b) => a - b);
+    const trimmedTotal = allResults.slice(TRIM, allResults.length - TRIM);
+    const meanTotal = trimmedTotal.reduce((s, v) => s + v, 0) / trimmedTotal.length;
 
-    // Output single number: trimmed mean ms rounded to 2 decimals
-    console.log(Math.round(mean * 100) / 100);
+    // Per-case trimmed mean
+    console.log(`\n--- PG Execution Benchmark (${ITERATIONS} iter × ${RUNS} runs, trim ±${TRIM}) ---`);
+    console.log(`Data: 50K users, 100K orders, 10K products, 40K product_tags`);
+    console.log('');
+    console.log('Case                         Time (ms)    Per-query (ms)');
+    console.log('─'.repeat(58));
+
+    for (const bc of benchCases) {
+      const times = caseAccum.get(bc.name)!;
+      times.sort((a, b) => a - b);
+      const trimmed = times.slice(TRIM, times.length - TRIM);
+      const mean = trimmed.reduce((s, v) => s + v, 0) / trimmed.length;
+      const perQuery = mean / ITERATIONS;
+      console.log(
+        `${bc.name.padEnd(28)} ${mean.toFixed(1).padStart(8)}      ${perQuery.toFixed(3).padStart(8)}`
+      );
+    }
+
+    console.log('');
+    console.log(`Total: ${Math.round(meanTotal * 100) / 100}`);
   } finally {
     await pool.end();
   }
