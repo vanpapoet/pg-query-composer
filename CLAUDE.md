@@ -92,11 +92,20 @@ We keep all important docs in `./docs` folder and keep updating them, structure 
 
 ## Performance & Benchmarks
 
-- **Guard**: `npx vitest run tests/core tests/composition tests/subquery tests/relations tests/pg tests/types tests/integration` (203 tests)
+- **Guard**: `npx vitest run tests/core tests/composition tests/subquery tests/relations tests/pg tests/types tests/integration tests/security` (247 tests)
 - **JS benchmark**: `npx tsx benchmarks/benchmark-runner.ts` (--baseline to save, --save for snapshot)
 - **PG benchmark**: `docker-compose up -d && npx tsx benchmarks/pg-execution-benchmark.ts` (requires PG on port 5499)
 - **Inline toParam() does NOT help** — V8 optimizes SelectBuilder's separate methods better; confirmed twice, do not retry
 - **PG pool deadlock**: never `pool.connect()` then `pool.query()` on same `max:1` pool — use separate pools for setup vs benchmark
+
+## Security
+
+- **Parameterization**: All user values MUST go through `$N` placeholders — NEVER interpolate into SQL strings
+- **`__rawValues` pattern**: JSONB/FTS filter functions return `{ __raw: 'col op ?', __rawValues: [...] }` — `where()` merges both
+- **Subquery `$N→?` conversion**: When embedding subquery `toParam()` into outer `whereRaw`, convert `$N` to `?` via `.replace(/\$\d+/g, '?')` for re-numbering
+- **`validateIdentifier()`**: `src/core/identifier-validation.ts` — apply to all raw identifier contexts (table, join, alias, CTE name)
+- **FTS config whitelist**: `VALID_FTS_CONFIGS` set in `src/pg/fts.ts` — 29 standard PG configs, rejects arbitrary strings
+- **`toString()` is debug-only**: Never use for query execution — it inlines values with weak escaping
 
 ## MCP & Context Optimization
 
