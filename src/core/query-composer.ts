@@ -288,27 +288,33 @@ export class QueryComposer {
   // ===========================================================================
 
   /**
-   * Add WHERE IN with subquery or array values
+   * Add WHERE IN with subquery or array values.
+   * Subqueries preserve parameterization (no inline value interpolation).
    */
   whereIn(column: string, subqueryOrValues: QueryComposer | unknown[]): this {
     if (subqueryOrValues instanceof QueryComposer) {
-      const subquerySql = subqueryOrValues.toSelect().toString();
-      this.whereRaw(`${column} IN (${subquerySql})`);
+      const { text, values } = subqueryOrValues.toParam();
+      // Convert $N placeholders back to ? for re-numbering by outer query
+      const rawText = text.replace(/\$\d+/g, '?');
+      this.whereRaw(column + ' IN (' + rawText + ')', values);
     } else {
-      this.where({ [`${column}__in`]: subqueryOrValues });
+      this.where({ [column + '__in']: subqueryOrValues });
     }
     return this;
   }
 
   /**
-   * Add WHERE NOT IN with subquery or array values
+   * Add WHERE NOT IN with subquery or array values.
+   * Subqueries preserve parameterization (no inline value interpolation).
    */
   whereNotIn(column: string, subqueryOrValues: QueryComposer | unknown[]): this {
     if (subqueryOrValues instanceof QueryComposer) {
-      const subquerySql = subqueryOrValues.toSelect().toString();
-      this.whereRaw(`${column} NOT IN (${subquerySql})`);
+      const { text, values } = subqueryOrValues.toParam();
+      // Convert $N placeholders back to ? for re-numbering by outer query
+      const rawText = text.replace(/\$\d+/g, '?');
+      this.whereRaw(column + ' NOT IN (' + rawText + ')', values);
     } else {
-      this.where({ [`${column}__notin`]: subqueryOrValues });
+      this.where({ [column + '__notin']: subqueryOrValues });
     }
     return this;
   }
