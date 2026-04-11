@@ -114,49 +114,63 @@ export class RecursiveCTEBuilder<T extends z.ZodTypeAny> {
   }
 
   /**
-   * Generate the SQL string
-   *
-   * @returns SQL string with WITH RECURSIVE
-   */
-  toSQL(): string {
-    const columns = this.getColumnList();
-    const depthCol = this.includeDepth ? ', depth' : '';
-    const depthInit = this.includeDepth ? ', 0 AS depth' : '';
-    const depthInc = this.includeDepth ? ', depth + 1' : '';
-    const depthWhere = this.maxDepth !== null ? ` WHERE depth < ${this.maxDepth}` : '';
-
-    // Base case SQL
-    const baseSQL = this.baseQuery
-      ? this.baseQuery.toSQL().replace('SELECT', `SELECT ${columns}${depthInit}`)
-      : `SELECT ${columns}${depthInit} FROM ${this.sourceTable}`;
-
-    // Recursive case SQL
-    const recursiveSQL = `
-      SELECT ${this.recursiveTable}.${columns.replace(/, /g, `, ${this.recursiveTable}.`)}${depthInc}
-      FROM ${this.recursiveTable}
-      JOIN ${this.name} ON ${this.recursiveJoinCondition}${depthWhere}
-    `.trim();
-
-    return `
-WITH RECURSIVE ${this.name} AS (
-  ${baseSQL}
-  UNION ALL
-  ${recursiveSQL}
-)
-SELECT ${columns}${depthCol} FROM ${this.name}
-    `.trim();
-  }
-
-  /**
-   * Generate parameterized query
+   * Generate parameterized query.
+   * Uses $N placeholders for base query values to prevent SQL injection.
    *
    * @returns Object with text and values
    */
   toParam(): { text: string; values: unknown[] } {
-    return {
-      text: this.toSQL(),
-      values: this.baseQuery ? this.baseQuery.toParam().values : [],
-    };
+    const columns = this.getColumnList();
+    const depthCol = this.includeDepth ? ', depth' : '';
+    const depthInit = this.includeDepth ? ', 0 AS depth' : '';
+    const depthInc = this.includeDepth ? ', depth + 1' : '';
+    const depthWhere = this.maxDepth !== null ? ' WHERE depth < ' + this.maxDepth : '';
+
+    // Base case — use toParam() to preserve $N placeholders
+    let baseSQL: string;
+    let baseValues: unknown[];
+    if (this.baseQuery) {
+      const param = this.baseQuery.toParam();
+      baseSQL = param.text.replace('SELECT', 'SELECT ' + columns + depthInit + ',');
+      // Fix double comma if SELECT * → SELECT cols, *, remove trailing *
+      baseSQL = baseSQL.replace(columns + depthInit + ', *', columns + depthInit);
+      baseValues = param.values;
+    } else {
+      baseSQL = 'SELECT ' + columns + depthInit + ' FROM ' + this.sourceTable;
+      baseValues = [];
+    }
+
+    // Recursive case — no user values, safe string construction
+    const recursiveSQL =
+      'SELECT ' + this.recursiveTable + '.' + columns.replace(/, /g, ', ' + this.recursiveTable + '.') + depthInc +
+      ' FROM ' + this.recursiveTable +
+      ' JOIN ' + this.name + ' ON ' + this.recursiveJoinCondition + depthWhere;
+
+    const text =
+      'WITH RECURSIVE ' + this.name + ' AS (\n  ' +
+      baseSQL + '\n  UNION ALL\n  ' +
+      recursiveSQL + '\n)\nSELECT ' + columns + depthCol + ' FROM ' + this.name;
+
+    return { text, values: baseValues };
+  }
+
+  /**
+   * Generate SQL string with inlined values (for debugging only).
+   * WARNING: Do NOT use for query execution — use toParam() instead.
+   *
+   * @returns SQL string with inlined values
+   */
+  toSQL(): string {
+    const { text, values } = this.toParam();
+    let result = text;
+    for (let i = values.length; i >= 1; i--) {
+      const val = values[i - 1];
+      const replacement = typeof val === 'string'
+        ? "'" + val.replace(/'/g, "''") + "'"
+        : val === null ? 'NULL' : String(val);
+      result = result.replace('$' + i, replacement);
+    }
+    return result;
   }
 
   /**
