@@ -106,6 +106,7 @@ We keep all important docs in `./docs` folder and keep updating them, structure 
 - **`validateIdentifier()`**: `src/core/identifier-validation.ts` — apply to all raw identifier contexts (table, join, alias, CTE name)
 - **FTS config whitelist**: `VALID_FTS_CONFIGS` set in `src/pg/fts.ts` — 29 standard PG configs, rejects arbitrary strings
 - **`toString()` is debug-only**: Never use for query execution — it inlines values with weak escaping
+- **FTS expression functions**: `fullTextRank`, `tsHeadline`, etc. use `escapeQuery()` for inline values — any new string interpolation into SQL literals must escape `\` and `'`
 
 ## MCP & Context Optimization
 

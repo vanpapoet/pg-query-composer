@@ -250,7 +250,9 @@ export function tsHeadline(
     for (const k in options) {
       validateIdentifier(k);
       if (parts) parts += ', ';
-      parts += k + '=' + String(options[k]);
+      // Escape single quotes and backslashes in option values to prevent SQL injection
+      const v = String(options[k]).replace(/\\/g, '\\\\').replace(/'/g, "''");
+      parts += k + '=' + v;
     }
     optStr = ", '" + parts + "'";
   }
