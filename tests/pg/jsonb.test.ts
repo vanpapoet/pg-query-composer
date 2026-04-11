@@ -19,10 +19,10 @@ const MetadataSchema = z.object({
 
 describe('JSONB Operators', () => {
   describe('jsonbContains()', () => {
-    it('generates @> operator', () => {
+    it('generates @> operator with parameterized value', () => {
       const filter = jsonbContains('data', { status: 'active' });
-      expect(filter.__raw).toContain('@>');
-      expect(filter.__raw).toContain('data');
+      expect(filter.__raw).toBe('data @> ?::jsonb');
+      expect(filter.__rawValues).toEqual(['{"status":"active"}']);
     });
 
     it('can be used with where()', () => {
@@ -35,10 +35,10 @@ describe('JSONB Operators', () => {
   });
 
   describe('jsonbHasKey()', () => {
-    it('generates ? operator for single key', () => {
+    it('generates ? operator for single key with parameterized value', () => {
       const filter = jsonbHasKey('data', 'status');
       expect(filter.__raw).toContain('?');
-      expect(filter.__raw).toContain('status');
+      expect(filter.__rawValues).toEqual(['status']);
     });
   });
 

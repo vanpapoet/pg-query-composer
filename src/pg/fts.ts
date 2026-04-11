@@ -2,9 +2,32 @@
  * PostgreSQL Full-Text Search operators and functions
  *
  * Provides helpers for working with tsvector and tsquery.
+ * All filter functions return parameterized queries to prevent SQL injection.
  */
 
-type RawFilter = { __raw: string };
+import { validateIdentifier } from '../core/identifier-validation';
+
+type RawFilter = { __raw: string; __rawValues?: unknown[] };
+
+// Whitelist of valid PG text search configurations
+const VALID_FTS_CONFIGS = new Set([
+  'simple', 'arabic', 'armenian', 'basque', 'catalan', 'danish', 'dutch',
+  'english', 'finnish', 'french', 'german', 'greek', 'hindi', 'hungarian',
+  'indonesian', 'irish', 'italian', 'lithuanian', 'nepali', 'norwegian',
+  'portuguese', 'romanian', 'russian', 'serbian', 'spanish', 'swedish',
+  'tamil', 'turkish', 'yiddish',
+]);
+
+/**
+ * Validate FTS config is a known safe value
+ */
+function validateFtsConfig(config: string): void {
+  if (!VALID_FTS_CONFIGS.has(config)) {
+    throw new Error(
+      `Invalid FTS config: "${config}". Use a standard PostgreSQL text search configuration.`
+    );
+  }
+}
 
 /**
  * Full-text search match operator (@@)
@@ -19,7 +42,7 @@ type RawFilter = { __raw: string };
  * @example
  * ```typescript
  * qc.where(fullTextSearch('search_vector', 'react hooks'));
- * // Generates: search_vector @@ plainto_tsquery('english', 'react hooks')
+ * // Generates: search_vector @@ plainto_tsquery('english', $1)
  * ```
  */
 export function fullTextSearch(
@@ -27,8 +50,11 @@ export function fullTextSearch(
   query: string,
   config = 'english'
 ): RawFilter {
+  validateIdentifier(column);
+  validateFtsConfig(config);
   return {
-    __raw: column + " @@ plainto_tsquery('" + config + "', '" + escapeQuery(query) + "')",
+    __raw: column + " @@ plainto_tsquery('" + config + "', ?)",
+    __rawValues: [query],
   };
 }
 
@@ -53,8 +79,11 @@ export function fullTextWebSearch(
   query: string,
   config = 'english'
 ): RawFilter {
+  validateIdentifier(column);
+  validateFtsConfig(config);
   return {
-    __raw: column + " @@ websearch_to_tsquery('" + config + "', '" + escapeQuery(query) + "')",
+    __raw: column + " @@ websearch_to_tsquery('" + config + "', ?)",
+    __rawValues: [query],
   };
 }
 
@@ -79,8 +108,11 @@ export function fullTextRawSearch(
   query: string,
   config = 'english'
 ): RawFilter {
+  validateIdentifier(column);
+  validateFtsConfig(config);
   return {
-    __raw: column + " @@ to_tsquery('" + config + "', '" + escapeQuery(query) + "')",
+    __raw: column + " @@ to_tsquery('" + config + "', ?)",
+    __rawValues: [query],
   };
 }
 
@@ -105,6 +137,8 @@ export function fullTextRank(
   query: string,
   config = 'english'
 ): string {
+  validateIdentifier(column);
+  validateFtsConfig(config);
   return "ts_rank(" + column + ", plainto_tsquery('" + config + "', '" + escapeQuery(query) + "'))";
 }
 
@@ -123,6 +157,8 @@ export function fullTextRankCd(
   query: string,
   config = 'english'
 ): string {
+  validateIdentifier(column);
+  validateFtsConfig(config);
   return "ts_rank_cd(" + column + ", plainto_tsquery('" + config + "', '" + escapeQuery(query) + "'))";
 }
 
@@ -137,11 +173,13 @@ export function fullTextRankCd(
  *
  * @example
  * ```typescript
- * const expr = toTsVector('english', 'title || \' \' || content');
- * // Generates: to_tsvector('english', title || ' ' || content)
+ * const expr = toTsVector('english', 'title');
+ * // Generates: to_tsvector('english', title)
  * ```
  */
 export function toTsVector(config: string, column: string): string {
+  validateFtsConfig(config);
+  validateIdentifier(column);
   return "to_tsvector('" + config + "', " + column + ')';
 }
 
@@ -155,6 +193,7 @@ export function toTsVector(config: string, column: string): string {
  * @returns SQL expression string
  */
 export function toTsQuery(config: string, query: string): string {
+  validateFtsConfig(config);
   return "to_tsquery('" + config + "', '" + escapeQuery(query) + "')";
 }
 
@@ -168,6 +207,7 @@ export function toTsQuery(config: string, query: string): string {
  * @returns SQL expression string
  */
 export function plainto_tsquery(config: string, query: string): string {
+  validateFtsConfig(config);
   return "plainto_tsquery('" + config + "', '" + escapeQuery(query) + "')";
 }
 
@@ -181,6 +221,7 @@ export function plainto_tsquery(config: string, query: string): string {
  * @returns SQL expression string
  */
 export function websearch_to_tsquery(config: string, query: string): string {
+  validateFtsConfig(config);
   return "websearch_to_tsquery('" + config + "', '" + escapeQuery(query) + "')";
 }
 
@@ -201,12 +242,15 @@ export function tsHeadline(
   query: string,
   options?: Record<string, string | number>
 ): string {
+  validateFtsConfig(config);
+  validateIdentifier(document);
   let optStr = '';
   if (options) {
     let parts = '';
     for (const k in options) {
+      validateIdentifier(k);
       if (parts) parts += ', ';
-      parts += k + '=' + options[k];
+      parts += k + '=' + String(options[k]);
     }
     optStr = ", '" + parts + "'";
   }
