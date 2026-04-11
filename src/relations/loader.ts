@@ -41,9 +41,12 @@ export function groupByKey<T extends Record<string, unknown>>(
 
   for (const item of items) {
     const keyValue = item[key];
-    const existing = grouped.get(keyValue) || [];
-    existing.push(item);
-    grouped.set(keyValue, existing);
+    let arr = grouped.get(keyValue);
+    if (!arr) {
+      arr = [];
+      grouped.set(keyValue, arr);
+    }
+    arr.push(item);
   }
 
   return grouped;
@@ -84,7 +87,7 @@ export function createRelationLoader(
   return new DataLoader<string, Record<string, unknown>[]>(
     async (keys) => {
       const uniqueKeys = [...new Set(keys)];
-      const config = getBatchLoadConfig(model, relationName, uniqueKeys);
+      const config = getBatchLoadConfig(model, relation, uniqueKeys);
 
       // Execute the batch query
       const results = await executor(config.query);
@@ -96,139 +99,146 @@ export function createRelationLoader(
       return keys.map((key) => grouped.get(key) || []);
     },
     {
-      // Use string representation for cache key
-      cacheKeyFn: (key) => String(key),
+      // Cache enabled by default — DataLoader deduplicates within same tick
     }
   );
 }
 
 /**
- * Get batch load configuration based on relation type
+ * Get batch load configuration based on relation type.
+ * Accepts pre-resolved relation to avoid redundant lookups.
  */
 function getBatchLoadConfig(
   model: ModelDefinition,
-  relationName: string,
+  relation: RelationConfig,
   keys: string[]
 ): BatchLoadConfig {
-  const relation = getRelation(model, relationName)!;
-
   switch (relation.type) {
     case 'belongsTo':
-      return batchLoadBelongsTo(model, relationName, keys);
+      return batchLoadBelongsToWithRelation(model, relation, keys);
     case 'hasOne':
-      return batchLoadHasOne(model, relationName, keys);
+      return batchLoadHasOneWithRelation(model, relation, keys);
     case 'hasMany':
-      return batchLoadHasMany(model, relationName, keys);
+      return batchLoadHasManyWithRelation(model, relation, keys);
     case 'hasManyThrough':
-      return batchLoadHasManyThrough(model, relationName, keys);
+      return batchLoadHasManyThroughWithRelation(model, relation, keys);
   }
 }
 
 /**
- * Generate batch load config for belongsTo relation
+ * Internal: batch load with pre-resolved BelongsTo relation
+ */
+function batchLoadBelongsToWithRelation(
+  model: ModelDefinition,
+  relation: BelongsToRelation,
+  keys: string[]
+): BatchLoadConfig {
+  const qc = new QueryComposer(
+    model.schema,
+    relation.target,
+    { strict: false, extraColumns: [relation.primaryKey] }
+  );
+  qc.whereIn(relation.primaryKey, keys);
+  return { query: qc.toParam(), batchKey: relation.primaryKey, isSingle: true };
+}
+
+/**
+ * Internal: batch load with pre-resolved HasOne relation
+ */
+function batchLoadHasOneWithRelation(
+  model: ModelDefinition,
+  relation: HasOneRelation,
+  keys: string[]
+): BatchLoadConfig {
+  const qc = new QueryComposer(
+    model.schema,
+    relation.target,
+    { strict: false, extraColumns: [relation.foreignKey] }
+  );
+  qc.whereIn(relation.foreignKey, keys);
+  return { query: qc.toParam(), batchKey: relation.foreignKey, isSingle: true };
+}
+
+/**
+ * Internal: batch load with pre-resolved HasMany relation
+ */
+function batchLoadHasManyWithRelation(
+  model: ModelDefinition,
+  relation: HasManyRelation,
+  keys: string[]
+): BatchLoadConfig {
+  const qc = new QueryComposer(
+    model.schema,
+    relation.target,
+    { strict: false, extraColumns: [relation.foreignKey] }
+  );
+  qc.whereIn(relation.foreignKey, keys);
+  return { query: qc.toParam(), batchKey: relation.foreignKey, isSingle: false };
+}
+
+/**
+ * Internal: batch load with pre-resolved HasManyThrough relation
+ */
+function batchLoadHasManyThroughWithRelation(
+  model: ModelDefinition,
+  relation: HasManyThroughRelation,
+  keys: string[]
+): BatchLoadConfig {
+  const qc = new QueryComposer(
+    model.schema,
+    relation.target,
+    { strict: false, extraColumns: [relation.foreignKey, relation.throughForeignKey] }
+  );
+  qc.join(
+    relation.through,
+    `${relation.target}.${relation.throughPrimaryKey} = ${relation.through}.${relation.throughForeignKey}`
+  );
+  qc.whereIn(`${relation.through}.${relation.foreignKey}`, keys);
+  return { query: qc.toParam(), batchKey: relation.foreignKey, isSingle: false };
+}
+
+/**
+ * Generate batch load config for belongsTo relation (public API)
  */
 export function batchLoadBelongsTo(
   model: ModelDefinition,
   relationName: string,
   keys: string[]
 ): BatchLoadConfig {
-  const relation = getRelation(model, relationName) as BelongsToRelation;
-
-  const qc = new QueryComposer(
-    model.schema, // Using parent schema as placeholder
-    relation.target,
-    { strict: false, extraColumns: [relation.primaryKey] }
-  );
-
-  qc.whereIn(relation.primaryKey, keys);
-
-  return {
-    query: qc.toParam(),
-    batchKey: relation.primaryKey,
-    isSingle: true,
-  };
+  return batchLoadBelongsToWithRelation(model, getRelation(model, relationName) as BelongsToRelation, keys);
 }
 
 /**
- * Generate batch load config for hasOne relation
+ * Generate batch load config for hasOne relation (public API)
  */
 export function batchLoadHasOne(
   model: ModelDefinition,
   relationName: string,
   keys: string[]
 ): BatchLoadConfig {
-  const relation = getRelation(model, relationName) as HasOneRelation;
-
-  const qc = new QueryComposer(
-    model.schema,
-    relation.target,
-    { strict: false, extraColumns: [relation.foreignKey] }
-  );
-
-  qc.whereIn(relation.foreignKey, keys);
-
-  return {
-    query: qc.toParam(),
-    batchKey: relation.foreignKey,
-    isSingle: true,
-  };
+  return batchLoadHasOneWithRelation(model, getRelation(model, relationName) as HasOneRelation, keys);
 }
 
 /**
- * Generate batch load config for hasMany relation
+ * Generate batch load config for hasMany relation (public API)
  */
 export function batchLoadHasMany(
   model: ModelDefinition,
   relationName: string,
   keys: string[]
 ): BatchLoadConfig {
-  const relation = getRelation(model, relationName) as HasManyRelation;
-
-  const qc = new QueryComposer(
-    model.schema,
-    relation.target,
-    { strict: false, extraColumns: [relation.foreignKey] }
-  );
-
-  qc.whereIn(relation.foreignKey, keys);
-
-  return {
-    query: qc.toParam(),
-    batchKey: relation.foreignKey,
-    isSingle: false,
-  };
+  return batchLoadHasManyWithRelation(model, getRelation(model, relationName) as HasManyRelation, keys);
 }
 
 /**
- * Generate batch load config for hasManyThrough relation
+ * Generate batch load config for hasManyThrough relation (public API)
  */
 export function batchLoadHasManyThrough(
   model: ModelDefinition,
   relationName: string,
   keys: string[]
 ): BatchLoadConfig {
-  const relation = getRelation(model, relationName) as HasManyThroughRelation;
-
-  // For hasManyThrough, we need a JOIN query
-  const qc = new QueryComposer(
-    model.schema,
-    relation.target,
-    { strict: false, extraColumns: [relation.foreignKey, relation.throughForeignKey] }
-  );
-
-  // Join through the pivot table
-  qc.join(
-    relation.through,
-    `${relation.target}.${relation.throughPrimaryKey} = ${relation.through}.${relation.throughForeignKey}`
-  );
-
-  qc.whereIn(`${relation.through}.${relation.foreignKey}`, keys);
-
-  return {
-    query: qc.toParam(),
-    batchKey: relation.foreignKey,
-    isSingle: false,
-  };
+  return batchLoadHasManyThroughWithRelation(model, getRelation(model, relationName) as HasManyThroughRelation, keys);
 }
 
 /**
@@ -245,7 +255,7 @@ export function createAllRelationLoaders(
   const loaders = new Map<string, DataLoader<string, Record<string, unknown>[]>>();
 
   if (model.relations) {
-    for (const relationName of Object.keys(model.relations)) {
+    for (const relationName in model.relations) {
       loaders.set(relationName, createRelationLoader(model, relationName, executor));
     }
   }
