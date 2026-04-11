@@ -71,17 +71,17 @@ export class SelectBuilder {
   }
 
   join(tableRef: string, _alias: undefined, on: string): this {
-    this._joins.push('INNER JOIN ' + tableRef + ' ON ' + on);
+    this._joins.push('INNER JOIN ' + tableRef + ' ON (' + on + ')');
     return this;
   }
 
   left_join(tableRef: string, _alias: undefined, on: string): this {
-    this._joins.push('LEFT JOIN ' + tableRef + ' ON ' + on);
+    this._joins.push('LEFT JOIN ' + tableRef + ' ON (' + on + ')');
     return this;
   }
 
   right_join(tableRef: string, _alias: undefined, on: string): this {
-    this._joins.push('RIGHT JOIN ' + tableRef + ' ON ' + on);
+    this._joins.push('RIGHT JOIN ' + tableRef + ' ON (' + on + ')');
     return this;
   }
 
@@ -167,11 +167,11 @@ export class SelectBuilder {
       }
     }
 
-    // HAVING — build inline using parallel arrays (no redundant parens)
+    // HAVING — build inline using parallel arrays
     if (this._hConds.length > 0) {
-      let havingStr = replaceParams(this._hConds[0], this._hVals[0], pidx, allValues);
+      let havingStr = '(' + replaceParams(this._hConds[0], this._hVals[0], pidx, allValues) + ')';
       for (let i = 1; i < this._hConds.length; i++) {
-        havingStr += ' AND ' + replaceParams(this._hConds[i], this._hVals[i], pidx, allValues);
+        havingStr += ' AND (' + replaceParams(this._hConds[i], this._hVals[i], pidx, allValues) + ')';
       }
       sql += ' HAVING ' + havingStr;
     }
