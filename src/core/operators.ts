@@ -33,21 +33,15 @@ export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
   // ===== RANGE OPERATORS =====
   in: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
-    const len = arr.length;
-    if (len === 0) return ['FALSE', []];
-    if (len === 1) return [col + ' = ?', arr];
-    let p = '?';
-    for (let i = 1; i < len; i++) p += ', ?';
-    return [col + ' IN (' + p + ')', arr];
+    if (arr.length === 0) return ['FALSE', []];
+    const placeholders = arr.map(() => '?').join(', ');
+    return [col + ' IN (' + placeholders + ')', arr];
   },
   notin: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
-    const len = arr.length;
-    if (len === 0) return ['TRUE', []];
-    if (len === 1) return [col + ' != ?', arr];
-    let p = '?';
-    for (let i = 1; i < len; i++) p += ', ?';
-    return [col + ' NOT IN (' + p + ')', arr];
+    if (arr.length === 0) return ['TRUE', []];
+    const placeholders = arr.map(() => '?').join(', ');
+    return [col + ' NOT IN (' + placeholders + ')', arr];
   },
   between: (col, val) => {
     const arr = Array.isArray(val) ? val : [];
@@ -98,21 +92,18 @@ export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
   // ===== ARRAY OPERATORS (PostgreSQL) =====
   arraycontains: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
-    let p = '?';
-    for (let i = 1; i < arr.length; i++) p += ', ?';
-    return [col + ' @> ARRAY[' + p + ']', arr];
+    const placeholders = arr.map(() => '?').join(', ');
+    return [col + ' @> ARRAY[' + placeholders + ']', arr];
   },
   arrayoverlap: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
-    let p = '?';
-    for (let i = 1; i < arr.length; i++) p += ', ?';
-    return [col + ' && ARRAY[' + p + ']', arr];
+    const placeholders = arr.map(() => '?').join(', ');
+    return [col + ' && ARRAY[' + placeholders + ']', arr];
   },
   arraycontained: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
-    let p = '?';
-    for (let i = 1; i < arr.length; i++) p += ', ?';
-    return [col + ' <@ ARRAY[' + p + ']', arr];
+    const placeholders = arr.map(() => '?').join(', ');
+    return [col + ' <@ ARRAY[' + placeholders + ']', arr];
   },
 };
 
