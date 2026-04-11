@@ -4,6 +4,9 @@ import { RelationNotFoundError } from '../core/errors';
 import type { ModelDefinition, IncludeOptions, RelationConfig } from './types';
 import { getRelation, hasRelation } from './define';
 
+// Shared empty schema — avoids allocating z.object({}) per include query
+const EMPTY_SCHEMA = z.object({});
+
 /**
  * Include configuration tracked by ModelQueryComposer
  */
@@ -70,10 +73,10 @@ export class ModelQueryComposer extends QueryComposer {
   }
 
   /**
-   * Get all tracked includes
+   * Get all tracked includes (returns internal array — treat as readonly)
    */
-  getIncludes(): TrackedInclude[] {
-    return [...this.includes];
+  getIncludes(): readonly TrackedInclude[] {
+    return this.includes;
   }
 
   /**
@@ -98,7 +101,7 @@ export class ModelQueryComposer extends QueryComposer {
   }> {
     return this.includes.map((inc) => {
       const baseQuery = new QueryComposer(
-        z.object({}), // Will be replaced with actual schema
+        EMPTY_SCHEMA,
         inc.config.target,
         { strict: false }
       );
@@ -110,24 +113,10 @@ export class ModelQueryComposer extends QueryComposer {
         relation: inc.relation,
         type: inc.config.type,
         query: finalQuery.toParam(),
-        foreignKey: this.getForeignKey(inc.config),
+        foreignKey: inc.config.foreignKey,
         primaryKey: inc.config.primaryKey,
       };
     });
-  }
-
-  /**
-   * Get foreign key from relation config
-   */
-  private getForeignKey(config: RelationConfig): string {
-    switch (config.type) {
-      case 'belongsTo':
-      case 'hasOne':
-      case 'hasMany':
-        return config.foreignKey;
-      case 'hasManyThrough':
-        return config.foreignKey;
-    }
   }
 
   /**

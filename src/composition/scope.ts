@@ -38,9 +38,7 @@ export interface Scope<T> {
  * ```
  */
 export function scope<T>(callback: ScopeCallback<T>): Scope<T> {
-  return {
-    apply: (qc: QueryComposer) => callback(qc),
-  };
+  return { apply: callback };
 }
 
 /**

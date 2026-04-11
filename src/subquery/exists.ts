@@ -23,8 +23,8 @@ import { QueryComposer } from '../core/query-composer';
  * ```
  */
 export function exists(subquery: QueryComposer): Record<string, unknown> {
-  const sql = convertToExists(subquery.toSelect().toString());
-  return { __raw: `EXISTS (${sql})` };
+  const sql = convertToExists(subquery.toSQL());
+  return { __raw: 'EXISTS (' + sql + ')' };
 }
 
 /**
@@ -49,8 +49,8 @@ export function exists(subquery: QueryComposer): Record<string, unknown> {
  * ```
  */
 export function notExists(subquery: QueryComposer): Record<string, unknown> {
-  const sql = convertToExists(subquery.toSelect().toString());
-  return { __raw: `NOT EXISTS (${sql})` };
+  const sql = convertToExists(subquery.toSQL());
+  return { __raw: 'NOT EXISTS (' + sql + ')' };
 }
 
 /**
@@ -61,7 +61,9 @@ export function notExists(subquery: QueryComposer): Record<string, unknown> {
 function convertToExists(sql: string): string {
   // Replace SELECT ... FROM with SELECT 1 FROM for performance
   // The EXISTS clause only checks for row existence, not the actual values
-  return sql.replace(/^SELECT .* FROM/i, 'SELECT 1 FROM');
+  const fromIdx = sql.indexOf(' FROM');
+  if (fromIdx === -1) return sql;
+  return 'SELECT 1' + sql.slice(fromIdx);
 }
 
 /**
@@ -81,7 +83,7 @@ function convertToExists(sql: string): string {
  * ```
  */
 export function ref(table: string, column: string): string {
-  return `${table}.${column}`;
+  return table + '.' + column;
 }
 
 /**
@@ -127,7 +129,7 @@ export function lateral(
   alias: string
 ): { sql: string; alias: string; type: 'lateral' } {
   return {
-    sql: subquery.toSelect().toString(),
+    sql: subquery.toSQL(),
     alias,
     type: 'lateral',
   };
