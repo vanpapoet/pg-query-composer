@@ -1,26 +1,30 @@
 /**
  * SQL identifier validation to prevent injection via table/column names.
  *
- * Allows: letters, digits, underscores, dots (for schema.table),
- * and parentheses/spaces for expressions like COUNT(*) or table aliases.
- * Rejects anything that could alter SQL structure.
+ * Allows: letters, digits, underscores, dots (schema.table),
+ * parentheses/spaces (COUNT(*), table aliases), equals (JOIN ON),
+ * commas (multi-column expressions).
+ * Rejects: quotes, semicolons, comment markers (--), slashes, backslashes,
+ * and other characters that could alter SQL structure.
  */
 
-// Safe identifier pattern: alphanumeric, underscore, dot, space, parens, asterisk
-// Rejects: quotes, semicolons, dashes (--), slashes, backslashes, etc.
-const SAFE_IDENTIFIER_RE = /^[a-zA-Z0-9_.*() ]+$/;
+// Safe SQL expression pattern — permits characters needed for:
+//   identifiers (a-z, 0-9, _), schema refs (.), aliases/expressions (space, parens, *),
+//   join conditions (=), multi-column (,)
+// Rejects: ', ", ;, --, /, \, and other injection vectors
+const SAFE_SQL_EXPR_RE = /^[a-zA-Z0-9_.*() =,]+$/;
 
 /**
- * Validate that a string is a safe SQL identifier.
- * Throws if the identifier contains potentially dangerous characters.
+ * Validate that a string is a safe SQL identifier or expression.
+ * Throws if the string contains potentially dangerous characters.
  *
- * @param identifier - The identifier to validate
+ * @param identifier - The identifier or expression to validate
  * @throws Error if identifier contains unsafe characters
  */
 export function validateIdentifier(identifier: string): void {
-  if (!identifier || !SAFE_IDENTIFIER_RE.test(identifier)) {
+  if (!identifier || !SAFE_SQL_EXPR_RE.test(identifier)) {
     throw new Error(
-      `Unsafe SQL identifier: "${identifier}". Only alphanumeric, underscore, dot, space, parentheses, and asterisk are allowed.`
+      `Unsafe SQL identifier: "${identifier}". Only alphanumeric, underscore, dot, space, parentheses, asterisk, equals, and comma are allowed.`
     );
   }
 }
