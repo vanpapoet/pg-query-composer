@@ -2,6 +2,7 @@ import * as z from 'zod';
 import { extractZodColumns } from '../utils/zod-utils';
 import { OPERATORS, VALID_OPERATORS_SET } from './operators';
 import { InvalidColumnError, InvalidOperatorError } from './errors';
+import { validateIdentifier } from './identifier-validation';
 import { SelectBuilder } from './sql-builder';
 import type {
   QueryOperator,
@@ -102,6 +103,7 @@ export class QueryComposer {
     table: string,
     options?: QueryBuilderOptions
   ) {
+    validateIdentifier(table);
     this.schema = schema;
     this.table = table;
 
@@ -417,6 +419,9 @@ export class QueryComposer {
    * Add INNER JOIN
    */
   join(table: string, on: string, alias?: string): this {
+    validateIdentifier(table);
+    validateIdentifier(on);
+    if (alias) validateIdentifier(alias);
     this.joins.push({ type: 'inner', table, on, alias });
     return this;
   }
@@ -425,6 +430,9 @@ export class QueryComposer {
    * Add LEFT JOIN
    */
   leftJoin(table: string, on: string, alias?: string): this {
+    validateIdentifier(table);
+    validateIdentifier(on);
+    if (alias) validateIdentifier(alias);
     this.joins.push({ type: 'left', table, on, alias });
     return this;
   }
@@ -433,6 +441,9 @@ export class QueryComposer {
    * Add RIGHT JOIN
    */
   rightJoin(table: string, on: string, alias?: string): this {
+    validateIdentifier(table);
+    validateIdentifier(on);
+    if (alias) validateIdentifier(alias);
     this.joins.push({ type: 'right', table, on, alias });
     return this;
   }

@@ -1,5 +1,6 @@
 import type * as z from 'zod';
 import { QueryComposer } from '../core/query-composer';
+import { validateIdentifier } from '../core/identifier-validation';
 
 /**
  * Create a subquery builder
@@ -58,6 +59,7 @@ export function subqueryAs(
   table: string,
   alias: string
 ): { query: QueryComposer; alias: string } {
+  validateIdentifier(alias);
   return {
     query: new QueryComposer(schema, table + ' AS ' + alias, { strict: false }),
     alias,

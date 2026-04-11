@@ -1,4 +1,5 @@
 import { QueryComposer } from '../core/query-composer';
+import { validateIdentifier } from '../core/identifier-validation';
 
 /**
  * Create EXISTS condition for use in where()
@@ -83,6 +84,8 @@ function convertToExists(sql: string): string {
  * ```
  */
 export function ref(table: string, column: string): string {
+  validateIdentifier(table);
+  validateIdentifier(column);
   return table + '.' + column;
 }
 
@@ -128,6 +131,7 @@ export function lateral(
   subquery: QueryComposer,
   alias: string
 ): { sql: string; alias: string; type: 'lateral' } {
+  validateIdentifier(alias);
   return {
     sql: subquery.toSQL(),
     alias,

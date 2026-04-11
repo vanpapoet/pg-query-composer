@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { QueryComposer } from '../core/query-composer';
+import { validateIdentifier } from '../core/identifier-validation';
 
 /**
  * Recursive CTE Builder
@@ -18,6 +19,7 @@ export class RecursiveCTEBuilder<T extends z.ZodTypeAny> {
   private additionalColumns: string[] = [];
 
   constructor(name: string, schema: T) {
+    validateIdentifier(name);
     this.name = name;
     this.schema = schema;
   }
@@ -54,6 +56,8 @@ export class RecursiveCTEBuilder<T extends z.ZodTypeAny> {
    * ```
    */
   recursiveCase(table: string, joinCondition: string): this {
+    validateIdentifier(table);
+    validateIdentifier(joinCondition);
     this.recursiveTable = table;
     this.recursiveJoinCondition = joinCondition;
     return this;
@@ -66,6 +70,7 @@ export class RecursiveCTEBuilder<T extends z.ZodTypeAny> {
    * @returns this for chaining
    */
   from(table: string): this {
+    validateIdentifier(table);
     this.sourceTable = table;
     // Update base query table if already set
     if (this.baseQuery) {
