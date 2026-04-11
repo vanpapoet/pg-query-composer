@@ -154,3 +154,4 @@ export {
 
 // Utility exports
 export { extractZodColumns } from './utils/zod-utils';
+export { validateIdentifier } from './core/identifier-validation';

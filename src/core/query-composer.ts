@@ -177,11 +177,14 @@ export class QueryComposer {
       const value = filters[key];
       if (value === undefined) continue;
 
-      // Handle raw conditions
+      // Handle raw conditions with optional parameterized values
       if (key === '__raw' && typeof value === 'string') {
-        this.whereRaw(value);
+        const rawValues = filters['__rawValues'];
+        this.whereRaw(value, Array.isArray(rawValues) ? rawValues as unknown[] : []);
         continue;
       }
+      // Skip __rawValues key (consumed by __raw handler above)
+      if (key === '__rawValues') continue;
 
       const sepIdx = key.indexOf(sep);
       const column = sepIdx === -1 ? key : key.slice(0, sepIdx);

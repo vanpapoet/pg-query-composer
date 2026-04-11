@@ -2,9 +2,12 @@
  * PostgreSQL JSONB operators and functions
  *
  * Provides type-safe helpers for working with JSONB columns.
+ * All filter functions return parameterized queries to prevent SQL injection.
  */
 
-type RawFilter = { __raw: string };
+import { validateIdentifier } from '../core/identifier-validation';
+
+type RawFilter = { __raw: string; __rawValues?: unknown[] };
 
 /**
  * JSONB contains operator (@>)
@@ -18,11 +21,12 @@ type RawFilter = { __raw: string };
  * @example
  * ```typescript
  * qc.where(jsonbContains('data', { status: 'active' }));
- * // Generates: data @> '{"status":"active"}'
+ * // Generates: data @> $1::jsonb (parameterized)
  * ```
  */
 export function jsonbContains(column: string, value: unknown): RawFilter {
-  return { __raw: column + " @> '" + JSON.stringify(value) + "'::jsonb" };
+  validateIdentifier(column);
+  return { __raw: column + ' @> ?::jsonb', __rawValues: [JSON.stringify(value)] };
 }
 
 /**
@@ -35,7 +39,8 @@ export function jsonbContains(column: string, value: unknown): RawFilter {
  * @returns Filter object for use with where()
  */
 export function jsonbContainedBy(column: string, value: unknown): RawFilter {
-  return { __raw: column + " <@ '" + JSON.stringify(value) + "'::jsonb" };
+  validateIdentifier(column);
+  return { __raw: column + ' <@ ?::jsonb', __rawValues: [JSON.stringify(value)] };
 }
 
 /**
@@ -50,11 +55,12 @@ export function jsonbContainedBy(column: string, value: unknown): RawFilter {
  * @example
  * ```typescript
  * qc.where(jsonbHasKey('data', 'status'));
- * // Generates: data ? 'status'
+ * // Generates: data ? $1 (parameterized)
  * ```
  */
 export function jsonbHasKey(column: string, key: string): RawFilter {
-  return { __raw: column + " ? '" + key + "'" };
+  validateIdentifier(column);
+  return { __raw: column + ' ? ?', __rawValues: [key] };
 }
 
 /**
@@ -69,13 +75,13 @@ export function jsonbHasKey(column: string, key: string): RawFilter {
  * @example
  * ```typescript
  * qc.where(jsonbHasAllKeys('data', ['status', 'type']));
- * // Generates: data ?& array['status', 'type']
+ * // Generates: data ?& array[$1, $2] (parameterized)
  * ```
  */
 export function jsonbHasAllKeys(column: string, keys: string[]): RawFilter {
-  let keysArray = "'" + keys[0] + "'";
-  for (let i = 1; i < keys.length; i++) keysArray += ", '" + keys[i] + "'";
-  return { __raw: column + ' ?& array[' + keysArray + ']' };
+  validateIdentifier(column);
+  const placeholders = keys.map(() => '?').join(', ');
+  return { __raw: column + ' ?& array[' + placeholders + ']', __rawValues: keys };
 }
 
 /**
@@ -90,13 +96,13 @@ export function jsonbHasAllKeys(column: string, keys: string[]): RawFilter {
  * @example
  * ```typescript
  * qc.where(jsonbHasAnyKey('data', ['status', 'state']));
- * // Generates: data ?| array['status', 'state']
+ * // Generates: data ?| array[$1, $2] (parameterized)
  * ```
  */
 export function jsonbHasAnyKey(column: string, keys: string[]): RawFilter {
-  let keysArray = "'" + keys[0] + "'";
-  for (let i = 1; i < keys.length; i++) keysArray += ", '" + keys[i] + "'";
-  return { __raw: column + ' ?| array[' + keysArray + ']' };
+  validateIdentifier(column);
+  const placeholders = keys.map(() => '?').join(', ');
+  return { __raw: column + ' ?| array[' + placeholders + ']', __rawValues: keys };
 }
 
 /**
@@ -115,6 +121,8 @@ export function jsonbHasAnyKey(column: string, keys: string[]): RawFilter {
  * ```
  */
 export function jsonbPath(column: string, path: string[]): string {
+  validateIdentifier(column);
+  for (const p of path) validateIdentifier(p);
   let expr = column;
   for (let i = 0; i < path.length; i++) expr += "->'" + path[i] + "'";
   return expr;
@@ -137,6 +145,8 @@ export function jsonbPath(column: string, path: string[]): string {
  * ```
  */
 export function jsonbPathText(column: string, path: string[]): string {
+  validateIdentifier(column);
+  for (const p of path) validateIdentifier(p);
   if (path.length === 0) return column;
   if (path.length === 1) return column + "->>'" + path[0] + "'";
 
@@ -161,6 +171,8 @@ export function jsonbPathText(column: string, path: string[]): string {
  * ```
  */
 export function jsonbExtract(column: string, path: string[]): string {
+  validateIdentifier(column);
+  for (const p of path) validateIdentifier(p);
   let args = "'" + path[0] + "'";
   for (let i = 1; i < path.length; i++) args += ", '" + path[i] + "'";
   return 'jsonb_extract_path(' + column + ', ' + args + ')';
@@ -176,6 +188,8 @@ export function jsonbExtract(column: string, path: string[]): string {
  * @returns SQL expression string
  */
 export function jsonbExtractText(column: string, path: string[]): string {
+  validateIdentifier(column);
+  for (const p of path) validateIdentifier(p);
   let args = "'" + path[0] + "'";
   for (let i = 1; i < path.length; i++) args += ", '" + path[i] + "'";
   return 'jsonb_extract_path_text(' + column + ', ' + args + ')';
@@ -198,6 +212,8 @@ export function jsonbSet(
   value: unknown,
   createMissing = true
 ): string {
+  validateIdentifier(column);
+  for (const p of path) validateIdentifier(p);
   const pathArray = "'{" + path.join(',') + "}'";
   const jsonValue = JSON.stringify(value);
   return 'jsonb_set(' + column + ', ' + pathArray + ", '" + jsonValue + "'::jsonb, " + createMissing + ')';
@@ -212,6 +228,7 @@ export function jsonbSet(
  * @returns SQL expression string
  */
 export function jsonbArrayElements(column: string): string {
+  validateIdentifier(column);
   return 'jsonb_array_elements(' + column + ')';
 }
 
@@ -224,5 +241,6 @@ export function jsonbArrayElements(column: string): string {
  * @returns SQL expression string
  */
 export function jsonbObjectKeys(column: string): string {
+  validateIdentifier(column);
   return 'jsonb_object_keys(' + column + ')';
 }
