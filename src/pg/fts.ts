@@ -259,8 +259,9 @@ export function tsHeadline(
 }
 
 /**
- * Escape single quotes in query string
+ * Escape single quotes and backslashes in query string.
+ * Handles both standard_conforming_strings=on (default) and off.
  */
 function escapeQuery(query: string): string {
-  return query.replace(/'/g, "''");
+  return query.replace(/\\/g, '\\\\').replace(/'/g, "''");
 }
