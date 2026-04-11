@@ -17,7 +17,7 @@ import {
   fullTextRawSearch,
 } from '../../src/pg/fts';
 import { subquery } from '../../src/subquery/builder';
-import { ref } from '../../src/subquery/exists';
+import { ref, exists, notExists } from '../../src/subquery/exists';
 
 const UserSchema = z.object({
   id: z.number(),
@@ -323,6 +323,55 @@ describe('Subquery Parameterization', () => {
     expect(text).toContain('$1');
     expect(text).toContain('$2');
     expect(text).toContain('$3');
+  });
+});
+
+// ============================================================
+// EXISTS/NOT EXISTS PARAMETERIZATION
+// ============================================================
+
+describe('EXISTS/NOT EXISTS Parameterization', () => {
+  const CommentSchema = z.object({
+    id: z.string(),
+    post_id: z.string(),
+    approved: z.boolean(),
+  });
+
+  it('parameterizes exists() subquery values', () => {
+    const qc = new QueryComposer(UserSchema, 'users', { strict: false })
+      .where(exists(
+        new QueryComposer(CommentSchema, 'comments', { strict: false })
+          .whereRaw('comments.user_id = users.id')
+          .where({ approved__exact: true })
+      ));
+    const { text, values } = qc.toParam();
+    expect(text).toContain('EXISTS (SELECT 1 FROM comments');
+    expect(text).not.toContain("'true'");
+    expect(text).toContain('$1');
+    expect(values).toContain(true);
+  });
+
+  it('parameterizes notExists() subquery values', () => {
+    const qc = new QueryComposer(UserSchema, 'users', { strict: false })
+      .where(notExists(
+        new QueryComposer(CommentSchema, 'comments', { strict: false })
+          .whereRaw('comments.user_id = users.id')
+          .where({ approved__exact: false })
+      ));
+    const { text, values } = qc.toParam();
+    expect(text).toContain('NOT EXISTS (SELECT 1 FROM comments');
+    expect(values).toContain(false);
+  });
+
+  it('preserves parameterization with injection attempt in exists', () => {
+    const qc = new QueryComposer(UserSchema, 'users', { strict: false })
+      .where(exists(
+        new QueryComposer(CommentSchema, 'comments', { strict: false })
+          .where({ post_id__exact: "'; DROP TABLE comments;--" })
+      ));
+    const { text, values } = qc.toParam();
+    expect(text).not.toContain('DROP TABLE');
+    expect(values[0]).toBe("'; DROP TABLE comments;--");
   });
 });
 
