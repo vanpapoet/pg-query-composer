@@ -150,11 +150,11 @@ export class SelectBuilder {
       sql += ' ' + this._joins[i];
     }
 
-    // WHERE — build inline using parallel arrays
+    // WHERE — build inline using parallel arrays (no redundant parens)
     if (this._wConds.length > 0) {
-      let whereStr = '(' + replaceParams(this._wConds[0], this._wVals[0], pidx, allValues) + ')';
+      let whereStr = replaceParams(this._wConds[0], this._wVals[0], pidx, allValues);
       for (let i = 1; i < this._wConds.length; i++) {
-        whereStr += ' AND (' + replaceParams(this._wConds[i], this._wVals[i], pidx, allValues) + ')';
+        whereStr += ' AND ' + replaceParams(this._wConds[i], this._wVals[i], pidx, allValues);
       }
       sql += ' WHERE ' + whereStr;
     }
