@@ -6,52 +6,54 @@ import { validateIdentifier } from '../core/identifier-validation';
  *
  * Returns a filter object that when passed to where() generates an EXISTS clause.
  * Optimizes the subquery by replacing SELECT columns with SELECT 1.
+ * Uses parameterized queries to prevent SQL injection.
  *
  * @param subquery - QueryComposer subquery
- * @returns Filter object with raw EXISTS condition
+ * @returns Filter object with parameterized EXISTS condition
  *
  * @example
  * ```typescript
- * // Find posts that have at least one approved comment
  * const qc = new QueryComposer(PostSchema, 'posts')
  *   .where(exists(
  *     subquery(CommentSchema, 'comments')
  *       .whereRaw('comments.post_id = posts.id')
  *       .where({ approved: true })
  *   ));
- *
- * // Generates: WHERE EXISTS (SELECT 1 FROM comments WHERE ...)
+ * // Generates: WHERE EXISTS (SELECT 1 FROM comments WHERE ... AND approved = $N)
  * ```
  */
 export function exists(subquery: QueryComposer): Record<string, unknown> {
-  const sql = convertToExists(subquery.toSQL());
-  return { __raw: 'EXISTS (' + sql + ')' };
+  const { text, values } = subquery.toParam();
+  const existsSql = convertToExists(text);
+  // Convert $N placeholders to ? for re-numbering by outer query
+  const rawText = existsSql.replace(/\$\d+/g, '?');
+  return { __raw: 'EXISTS (' + rawText + ')', __rawValues: values };
 }
 
 /**
  * Create NOT EXISTS condition for use in where()
  *
  * Returns a filter object that when passed to where() generates a NOT EXISTS clause.
- * Useful for finding records that don't have related records.
+ * Uses parameterized queries to prevent SQL injection.
  *
  * @param subquery - QueryComposer subquery
- * @returns Filter object with raw NOT EXISTS condition
+ * @returns Filter object with parameterized NOT EXISTS condition
  *
  * @example
  * ```typescript
- * // Find posts that have no comments
  * const qc = new QueryComposer(PostSchema, 'posts')
  *   .where(notExists(
  *     subquery(CommentSchema, 'comments')
  *       .whereRaw('comments.post_id = posts.id')
  *   ));
- *
  * // Generates: WHERE NOT EXISTS (SELECT 1 FROM comments WHERE ...)
  * ```
  */
 export function notExists(subquery: QueryComposer): Record<string, unknown> {
-  const sql = convertToExists(subquery.toSQL());
-  return { __raw: 'NOT EXISTS (' + sql + ')' };
+  const { text, values } = subquery.toParam();
+  const existsSql = convertToExists(text);
+  const rawText = existsSql.replace(/\$\d+/g, '?');
+  return { __raw: 'NOT EXISTS (' + rawText + ')', __rawValues: values };
 }
 
 /**
@@ -60,8 +62,6 @@ export function notExists(subquery: QueryComposer): Record<string, unknown> {
  * @internal
  */
 function convertToExists(sql: string): string {
-  // Replace SELECT ... FROM with SELECT 1 FROM for performance
-  // The EXISTS clause only checks for row existence, not the actual values
   const fromIdx = sql.indexOf(' FROM');
   if (fromIdx === -1) return sql;
   return 'SELECT 1' + sql.slice(fromIdx);
@@ -70,15 +70,12 @@ function convertToExists(sql: string): string {
 /**
  * Create a correlated reference for use in subqueries
  *
- * Use this to reference columns from the outer query in correlated subqueries.
- *
  * @param table - Table name or alias
  * @param column - Column name
  * @returns Reference string
  *
  * @example
  * ```typescript
- * // Explicit table.column reference
  * subquery(CommentSchema, 'comments')
  *   .whereRaw(`comments.post_id = ${ref('posts', 'id')}`);
  * ```
@@ -92,48 +89,33 @@ export function ref(table: string, column: string): string {
 /**
  * Create a raw SQL expression
  *
- * Use this for expressions that cannot be represented with the query builder.
+ * WARNING: This passes the expression through unchanged. Do NOT use with
+ * user-controlled input. Only use for developer-authored SQL expressions.
  *
  * @param expression - Raw SQL expression
  * @returns The expression unchanged
- *
- * @example
- * ```typescript
- * qc.where({ __raw: raw('LOWER(name) = LOWER(email)') });
- * ```
  */
 export function raw(expression: string): string {
   return expression;
 }
 
 /**
- * Create a lateral subquery for correlated expressions
+ * Create a lateral subquery for correlated expressions.
+ * Uses parameterized queries to prevent SQL injection.
  *
  * @param subquery - QueryComposer subquery
  * @param alias - Alias for the subquery
- * @returns Lateral subquery configuration
- *
- * @example
- * ```typescript
- * // Use in join
- * qc.joinLateral(
- *   lateral(
- *     subquery(CommentSchema, 'comments')
- *       .where({ 'post_id': raw('posts.id') })
- *       .orderBy('-created_at')
- *       .paginate({ limit: 5 }),
- *     'recent_comments'
- *   )
- * );
- * ```
+ * @returns Lateral subquery configuration with parameterized SQL
  */
 export function lateral(
   subquery: QueryComposer,
   alias: string
-): { sql: string; alias: string; type: 'lateral' } {
+): { sql: string; values: unknown[]; alias: string; type: 'lateral' } {
   validateIdentifier(alias);
+  const { text, values } = subquery.toParam();
   return {
-    sql: subquery.toSQL(),
+    sql: text,
+    values,
     alias,
     type: 'lateral',
   };
