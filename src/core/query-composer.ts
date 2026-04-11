@@ -183,24 +183,20 @@ export class QueryComposer {
         continue;
       }
 
-      try {
-        const sepIdx = key.indexOf(sep);
-        const column = sepIdx === -1 ? key : key.slice(0, sepIdx);
-        const operator = (sepIdx === -1 ? 'exact' : key.slice(sepIdx + sepLen)) as QueryOperator;
+      const sepIdx = key.indexOf(sep);
+      const column = sepIdx === -1 ? key : key.slice(0, sepIdx);
+      const operator = (sepIdx === -1 ? 'exact' : key.slice(sepIdx + sepLen)) as QueryOperator;
 
-        if (!this.whitelistSet.has(column)) {
-          if (this.options.strict) throw new InvalidColumnError(column, this.whitelist);
-          continue;
-        }
-        if (!VALID_OPERATORS_SET.has(operator)) {
-          if (this.options.strict) throw new InvalidOperatorError(operator);
-          continue;
-        }
-
-        this.conditions.push({ column, operator, value });
-      } catch (e) {
-        if (this.options.strict) throw e;
+      if (!this.whitelistSet.has(column)) {
+        if (this.options.strict) throw new InvalidColumnError(column, this.whitelist);
+        continue;
       }
+      if (!VALID_OPERATORS_SET.has(operator)) {
+        if (this.options.strict) throw new InvalidOperatorError(operator);
+        continue;
+      }
+
+      this.conditions.push({ column, operator, value });
     }
     return this;
   }
@@ -224,18 +220,28 @@ export class QueryComposer {
    */
   or(filterGroups: Array<Record<string, unknown>>): this {
     const conditions: Condition[] = [];
+    const sep = this.options.separator;
+    const sepLen = sep.length;
 
     for (const filters of filterGroups) {
       for (const key in filters) {
         const value = filters[key];
         if (value === undefined) continue;
 
-        try {
-          const { column, operator } = this.parseFieldOperator(key);
-          conditions.push({ column, operator, value });
-        } catch (e) {
-          if (this.options.strict) throw e;
+        const sepIdx = key.indexOf(sep);
+        const column = sepIdx === -1 ? key : key.slice(0, sepIdx);
+        const operator = (sepIdx === -1 ? 'exact' : key.slice(sepIdx + sepLen)) as QueryOperator;
+
+        if (!this.whitelistSet.has(column)) {
+          if (this.options.strict) throw new InvalidColumnError(column, this.whitelist);
+          continue;
         }
+        if (!VALID_OPERATORS_SET.has(operator)) {
+          if (this.options.strict) throw new InvalidOperatorError(operator);
+          continue;
+        }
+
+        conditions.push({ column, operator, value });
       }
     }
 
@@ -249,16 +255,27 @@ export class QueryComposer {
    * Add NOT conditions
    */
   not(filters: Record<string, unknown>): this {
+    const sep = this.options.separator;
+    const sepLen = sep.length;
+
     for (const key in filters) {
       const value = filters[key];
       if (value === undefined) continue;
 
-      try {
-        const { column, operator } = this.parseFieldOperator(key);
-        this.notConditions.push({ column, operator, value });
-      } catch (e) {
-        if (this.options.strict) throw e;
+      const sepIdx = key.indexOf(sep);
+      const column = sepIdx === -1 ? key : key.slice(0, sepIdx);
+      const operator = (sepIdx === -1 ? 'exact' : key.slice(sepIdx + sepLen)) as QueryOperator;
+
+      if (!this.whitelistSet.has(column)) {
+        if (this.options.strict) throw new InvalidColumnError(column, this.whitelist);
+        continue;
       }
+      if (!VALID_OPERATORS_SET.has(operator)) {
+        if (this.options.strict) throw new InvalidOperatorError(operator);
+        continue;
+      }
+
+      this.notConditions.push({ column, operator, value });
     }
     return this;
   }
