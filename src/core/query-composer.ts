@@ -2,7 +2,7 @@ import * as z from 'zod';
 import { extractZodColumns } from '../utils/zod-utils';
 import { OPERATORS, VALID_OPERATORS_SET } from './operators';
 import { InvalidColumnError, InvalidOperatorError } from './errors';
-import { SelectBuilder, replaceParams } from './sql-builder';
+import { SelectBuilder } from './sql-builder';
 import type {
   QueryOperator,
   QueryBuilderOptions,
@@ -14,13 +14,6 @@ import type {
   JoinConfig,
   HavingCondition,
 } from './types';
-
-// JOIN type SQL prefix map
-const JOIN_PREFIX: Record<string, string> = {
-  inner: ' INNER JOIN ',
-  left: ' LEFT JOIN ',
-  right: ' RIGHT JOIN ',
-};
 
 // Negation map: operator → its negated form (avoids NOT wrapper in SQL)
 const NEGATED_OPERATORS: Partial<Record<QueryOperator, QueryOperator>> = {
@@ -646,118 +639,10 @@ export class QueryComposer {
   }
 
   /**
-   * Get parameterized query for SELECT — inlined for zero intermediate allocations.
-   * Builds SQL directly without creating a SelectBuilder instance.
+   * Get parameterized query for SELECT
    */
   toParam(): { text: string; values: unknown[] } {
-    const allValues: unknown[] = [];
-    const pidx = [0];
-
-    // SELECT + FROM
-    let sql: string;
-    if (this.selectedFields.length > 0) {
-      sql = 'SELECT ' + this.selectedFields[0];
-      for (let i = 1; i < this.selectedFields.length; i++) {
-        sql += ', ' + this.selectedFields[i];
-      }
-      sql += ' FROM ' + this.table;
-    } else if (this.excludedFields && this.excludedFields.size > 0) {
-      const fields = this.whitelist.filter((f) => !this.excludedFields!.has(f));
-      sql = 'SELECT ' + fields[0];
-      for (let i = 1; i < fields.length; i++) {
-        sql += ', ' + fields[i];
-      }
-      sql += ' FROM ' + this.table;
-    } else {
-      sql = 'SELECT * FROM ' + this.table;
-    }
-
-    // JOINs
-    for (let i = 0; i < this.joins.length; i++) {
-      const j = this.joins[i];
-      sql += JOIN_PREFIX[j.type] + (j.alias ? j.table + ' ' + j.alias : j.table) + ' ON (' + j.on + ')';
-    }
-
-    // WHERE — conditions, OR groups, NOT conditions
-    let hasWhere = false;
-
-    // AND conditions
-    for (let i = 0; i < this.conditions.length; i++) {
-      const cond = this.conditions[i];
-      if (cond.raw && cond.rawCondition) {
-        sql += (hasWhere ? ' AND ' : ' WHERE ') + replaceParams(cond.rawCondition, cond.value as unknown[], pidx, allValues);
-      } else {
-        const [condStr, values] = OPERATORS[cond.operator](cond.column, cond.value);
-        sql += (hasWhere ? ' AND ' : ' WHERE ') + replaceParams(condStr, values, pidx, allValues);
-      }
-      hasWhere = true;
-    }
-
-    // OR groups
-    for (let i = 0; i < this.orGroups.length; i++) {
-      const group = this.orGroups[i];
-      let orExpr = '';
-      for (let j = 0; j < group.conditions.length; j++) {
-        const cond = group.conditions[j];
-        const [condStr, values] = OPERATORS[cond.operator](cond.column, cond.value);
-        if (j > 0) orExpr += ' OR ';
-        orExpr += replaceParams(condStr, values, pidx, allValues);
-      }
-      if (orExpr) {
-        sql += (hasWhere ? ' AND ' : ' WHERE ') + '(' + orExpr + ')';
-        hasWhere = true;
-      }
-    }
-
-    // NOT conditions
-    for (let i = 0; i < this.notConditions.length; i++) {
-      const cond = this.notConditions[i];
-      const negated = NEGATED_OPERATORS[cond.operator];
-      if (negated) {
-        const [condStr, values] = OPERATORS[negated](cond.column, cond.value);
-        sql += (hasWhere ? ' AND ' : ' WHERE ') + replaceParams(condStr, values, pidx, allValues);
-      } else {
-        const [condStr, values] = OPERATORS[cond.operator](cond.column, cond.value);
-        sql += (hasWhere ? ' AND NOT (' : ' WHERE NOT (') + replaceParams(condStr, values, pidx, allValues) + ')';
-      }
-      hasWhere = true;
-    }
-
-    // GROUP BY
-    if (this.groupByFields.length > 0) {
-      sql += ' GROUP BY ' + this.groupByFields[0];
-      for (let i = 1; i < this.groupByFields.length; i++) {
-        sql += ', ' + this.groupByFields[i];
-      }
-    }
-
-    // HAVING
-    for (let i = 0; i < this.havingConditions.length; i++) {
-      const h = this.havingConditions[i];
-      sql += (i === 0 ? ' HAVING ' : ' AND ') + replaceParams(h.condition, h.values, pidx, allValues);
-    }
-
-    // ORDER BY
-    if (this.sortOptions.length > 0) {
-      sql += ' ORDER BY ' + this.sortOptions[0].column + (this.sortOptions[0].direction === 'ASC' ? ' ASC' : ' DESC');
-      for (let i = 1; i < this.sortOptions.length; i++) {
-        sql += ', ' + this.sortOptions[i].column + (this.sortOptions[i].direction === 'ASC' ? ' ASC' : ' DESC');
-      }
-    }
-
-    // LIMIT / OFFSET — parameterized for PG plan reuse
-    if (this.paginationOptions) {
-      const { page, limit } = this.paginationOptions;
-      const offset = (page! - 1) * limit!;
-      pidx[0]++;
-      allValues.push(limit);
-      sql += ' LIMIT $' + pidx[0];
-      pidx[0]++;
-      allValues.push(offset);
-      sql += ' OFFSET $' + pidx[0];
-    }
-
-    return { text: sql, values: allValues };
+    return this.toSelect().toParam();
   }
 
   /**

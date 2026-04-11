@@ -15,7 +15,7 @@ export interface ParamResult {
 /**
  * Replace ? placeholders with $N. Module-level to avoid closure allocation.
  */
-export function replaceParams(
+function replaceParams(
   clause: string,
   values: unknown[],
   pidx: number[],
