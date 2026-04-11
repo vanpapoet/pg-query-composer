@@ -28,7 +28,7 @@ export function fullTextSearch(
   config = 'english'
 ): RawFilter {
   return {
-    __raw: `${column} @@ plainto_tsquery('${config}', '${escapeQuery(query)}')`,
+    __raw: column + " @@ plainto_tsquery('" + config + "', '" + escapeQuery(query) + "')",
   };
 }
 
@@ -54,7 +54,7 @@ export function fullTextWebSearch(
   config = 'english'
 ): RawFilter {
   return {
-    __raw: `${column} @@ websearch_to_tsquery('${config}', '${escapeQuery(query)}')`,
+    __raw: column + " @@ websearch_to_tsquery('" + config + "', '" + escapeQuery(query) + "')",
   };
 }
 
@@ -80,7 +80,7 @@ export function fullTextRawSearch(
   config = 'english'
 ): RawFilter {
   return {
-    __raw: `${column} @@ to_tsquery('${config}', '${escapeQuery(query)}')`,
+    __raw: column + " @@ to_tsquery('" + config + "', '" + escapeQuery(query) + "')",
   };
 }
 
@@ -105,7 +105,7 @@ export function fullTextRank(
   query: string,
   config = 'english'
 ): string {
-  return `ts_rank(${column}, plainto_tsquery('${config}', '${escapeQuery(query)}'))`;
+  return "ts_rank(" + column + ", plainto_tsquery('" + config + "', '" + escapeQuery(query) + "'))";
 }
 
 /**
@@ -123,7 +123,7 @@ export function fullTextRankCd(
   query: string,
   config = 'english'
 ): string {
-  return `ts_rank_cd(${column}, plainto_tsquery('${config}', '${escapeQuery(query)}'))`;
+  return "ts_rank_cd(" + column + ", plainto_tsquery('" + config + "', '" + escapeQuery(query) + "'))";
 }
 
 /**
@@ -142,7 +142,7 @@ export function fullTextRankCd(
  * ```
  */
 export function toTsVector(config: string, column: string): string {
-  return `to_tsvector('${config}', ${column})`;
+  return "to_tsvector('" + config + "', " + column + ')';
 }
 
 /**
@@ -155,7 +155,7 @@ export function toTsVector(config: string, column: string): string {
  * @returns SQL expression string
  */
 export function toTsQuery(config: string, query: string): string {
-  return `to_tsquery('${config}', '${escapeQuery(query)}')`;
+  return "to_tsquery('" + config + "', '" + escapeQuery(query) + "')";
 }
 
 /**
@@ -168,7 +168,7 @@ export function toTsQuery(config: string, query: string): string {
  * @returns SQL expression string
  */
 export function plainto_tsquery(config: string, query: string): string {
-  return `plainto_tsquery('${config}', '${escapeQuery(query)}')`;
+  return "plainto_tsquery('" + config + "', '" + escapeQuery(query) + "')";
 }
 
 /**
@@ -181,7 +181,7 @@ export function plainto_tsquery(config: string, query: string): string {
  * @returns SQL expression string
  */
 export function websearch_to_tsquery(config: string, query: string): string {
-  return `websearch_to_tsquery('${config}', '${escapeQuery(query)}')`;
+  return "websearch_to_tsquery('" + config + "', '" + escapeQuery(query) + "')";
 }
 
 /**
@@ -201,13 +201,17 @@ export function tsHeadline(
   query: string,
   options?: Record<string, string | number>
 ): string {
-  const optStr = options
-    ? `, '${Object.entries(options)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(', ')}'`
-    : '';
+  let optStr = '';
+  if (options) {
+    let parts = '';
+    for (const k in options) {
+      if (parts) parts += ', ';
+      parts += k + '=' + options[k];
+    }
+    optStr = ", '" + parts + "'";
+  }
 
-  return `ts_headline('${config}', ${document}, plainto_tsquery('${config}', '${escapeQuery(query)}')${optStr})`;
+  return "ts_headline('" + config + "', " + document + ", plainto_tsquery('" + config + "', '" + escapeQuery(query) + "')" + optStr + ')';
 }
 
 /**

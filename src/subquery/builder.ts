@@ -1,4 +1,4 @@
-import * as z from 'zod';
+import type * as z from 'zod';
 import { QueryComposer } from '../core/query-composer';
 
 /**
@@ -59,7 +59,7 @@ export function subqueryAs(
   alias: string
 ): { query: QueryComposer; alias: string } {
   return {
-    query: new QueryComposer(schema, `${table} AS ${alias}`, { strict: false }),
+    query: new QueryComposer(schema, table + ' AS ' + alias, { strict: false }),
     alias,
   };
 }

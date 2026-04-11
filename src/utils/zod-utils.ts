@@ -29,45 +29,31 @@ export function extractZodColumns(schema: z.ZodTypeAny): string[] {
   const cached = zodColumnsCache.get(schema);
   if (cached) return cached;
 
-  const result = extractZodColumnsUncached(schema);
+  const result = extractColumnsUncached(schema);
   zodColumnsCache.set(schema, result);
   return result;
 }
 
-function extractZodColumnsUncached(schema: z.ZodTypeAny): string[] {
-  // Prefer instanceof for exact match (same zod version)
-  if (schema instanceof z.ZodObject) {
-    return Object.keys(schema.shape);
-  }
+/**
+ * Walk the schema to find the underlying ZodObject shape.
+ * Handles ZodObject, ZodEffects, ZodOptional, ZodNullable + duck-typing fallbacks.
+ */
+function extractColumnsUncached(schema: z.ZodTypeAny): string[] {
+  // Fast path: instanceof ZodObject (same zod version)
+  if (schema instanceof z.ZodObject) return Object.keys(schema.shape);
 
   // Duck-typing fallback for cross-version compatibility
-  if (isZodObjectLike(schema)) {
-    return Object.keys(schema.shape);
-  }
+  if (isZodObjectLike(schema)) return Object.keys(schema.shape);
 
-  // Handle ZodEffects (e.g., .refine(), .transform())
-  if (schema instanceof z.ZodEffects) {
-    return extractZodColumns(schema._def.schema);
-  }
+  // Wrapper types: unwrap and recurse (ZodEffects, ZodOptional, ZodNullable)
+  if (schema instanceof z.ZodEffects) return extractZodColumns(schema._def.schema);
+  if (schema instanceof z.ZodOptional) return extractZodColumns(schema._def.innerType);
+  if (schema instanceof z.ZodNullable) return extractZodColumns(schema._def.innerType);
 
-  // Handle ZodOptional
-  if (schema instanceof z.ZodOptional) {
-    return extractZodColumns(schema._def.innerType);
-  }
-
-  // Handle ZodNullable
-  if (schema instanceof z.ZodNullable) {
-    return extractZodColumns(schema._def.innerType);
-  }
-
-  // Duck-typing fallback for effects/optional/nullable
-  if (schema && typeof schema === 'object') {
-    const def = (schema as any)._def;
-    if (def) {
-      if (def.schema) return extractZodColumns(def.schema);
-      if (def.innerType) return extractZodColumns(def.innerType);
-    }
-  }
+  // Duck-typing fallback for wrapper types
+  const def = (schema as any)?._def;
+  if (def?.schema) return extractZodColumns(def.schema);
+  if (def?.innerType) return extractZodColumns(def.innerType);
 
   return [];
 }

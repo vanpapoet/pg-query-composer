@@ -19,7 +19,7 @@ export function fragment(
   operator: QueryOperator,
   value: unknown
 ): FilterFragment {
-  return { [`${field}__${operator}`]: value };
+  return { [field + '__' + operator]: value };
 }
 
 /**
@@ -36,7 +36,7 @@ export function dateRange(
   from: string,
   to: string
 ): FilterFragment {
-  return { [`${field}__between`]: [from, to] };
+  return { [field + '__between']: [from, to] };
 }
 
 /**
@@ -49,7 +49,7 @@ export function dateRange(
  * ```
  */
 export function inList(field: string, values: unknown[]): FilterFragment {
-  return { [`${field}__in`]: values };
+  return { [field + '__in']: values };
 }
 
 /**
@@ -62,7 +62,7 @@ export function inList(field: string, values: unknown[]): FilterFragment {
  * ```
  */
 export function notInList(field: string, values: unknown[]): FilterFragment {
-  return { [`${field}__notin`]: values };
+  return { [field + '__notin']: values };
 }
 
 /**
@@ -75,7 +75,7 @@ export function notInList(field: string, values: unknown[]): FilterFragment {
  * ```
  */
 export function isNull(field: string): FilterFragment {
-  return { [`${field}__isnull`]: true };
+  return { [field + '__isnull']: true };
 }
 
 /**
@@ -88,7 +88,7 @@ export function isNull(field: string): FilterFragment {
  * ```
  */
 export function isNotNull(field: string): FilterFragment {
-  return { [`${field}__isnotnull`]: true };
+  return { [field + '__isnotnull']: true };
 }
 
 /**
@@ -101,7 +101,7 @@ export function isNotNull(field: string): FilterFragment {
  * ```
  */
 export function contains(field: string, value: string): FilterFragment {
-  return { [`${field}__contains`]: value };
+  return { [field + '__contains']: value };
 }
 
 /**
@@ -114,7 +114,7 @@ export function contains(field: string, value: string): FilterFragment {
  * ```
  */
 export function startsWith(field: string, value: string): FilterFragment {
-  return { [`${field}__startswith`]: value };
+  return { [field + '__startswith']: value };
 }
 
 /**
@@ -127,7 +127,7 @@ export function startsWith(field: string, value: string): FilterFragment {
  * ```
  */
 export function endsWith(field: string, value: string): FilterFragment {
-  return { [`${field}__endswith`]: value };
+  return { [field + '__endswith']: value };
 }
 
 /**
@@ -144,7 +144,7 @@ export function between(
   from: unknown,
   to: unknown
 ): FilterFragment {
-  return { [`${field}__between`]: [from, to] };
+  return { [field + '__between']: [from, to] };
 }
 
 /**
@@ -157,7 +157,7 @@ export function between(
  * ```
  */
 export function greaterThan(field: string, value: unknown): FilterFragment {
-  return { [`${field}__gt`]: value };
+  return { [field + '__gt']: value };
 }
 
 /**
@@ -173,7 +173,7 @@ export function greaterThanOrEqual(
   field: string,
   value: unknown
 ): FilterFragment {
-  return { [`${field}__gte`]: value };
+  return { [field + '__gte']: value };
 }
 
 /**
@@ -186,7 +186,7 @@ export function greaterThanOrEqual(
  * ```
  */
 export function lessThan(field: string, value: unknown): FilterFragment {
-  return { [`${field}__lt`]: value };
+  return { [field + '__lt']: value };
 }
 
 /**
@@ -199,7 +199,7 @@ export function lessThan(field: string, value: unknown): FilterFragment {
  * ```
  */
 export function lessThanOrEqual(field: string, value: unknown): FilterFragment {
-  return { [`${field}__lte`]: value };
+  return { [field + '__lte']: value };
 }
 
 /**
@@ -225,5 +225,5 @@ export function exact(field: string, value: unknown): FilterFragment {
  * ```
  */
 export function notEqual(field: string, value: unknown): FilterFragment {
-  return { [`${field}__notexact`]: value };
+  return { [field + '__notexact']: value };
 }

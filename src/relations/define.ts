@@ -6,6 +6,9 @@ import type { ModelDefinition, RelationConfig } from './types';
  */
 const modelRegistry = new Map<string, ModelDefinition>();
 
+// Shared empty array to avoid allocation when model has no relations
+const EMPTY_RELATION_NAMES: string[] = [];
+
 /**
  * Define a model with its schema and relations
  *
@@ -51,7 +54,7 @@ export function defineModel<T extends z.ZodTypeAny>(
     name: config.name,
     table: config.table,
     schema: config.schema,
-    primaryKey: config.primaryKey ?? 'id',
+    primaryKey: config.primaryKey || 'id',
     relations: config.relations,
   };
 
@@ -129,7 +132,7 @@ export function getRelation(
  * @returns Array of relation names
  */
 export function getRelationNames(model: ModelDefinition): string[] {
-  return Object.keys(model.relations ?? {});
+  return model.relations ? Object.keys(model.relations) : EMPTY_RELATION_NAMES;
 }
 
 /**
@@ -142,6 +145,6 @@ export function clearModelRegistry(): void {
 /**
  * Get all registered models
  */
-export function getAllModels(): Map<string, ModelDefinition> {
-  return new Map(modelRegistry);
+export function getAllModels(): ReadonlyMap<string, ModelDefinition> {
+  return modelRegistry;
 }
