@@ -33,7 +33,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # package manager
-package-lock.json
+# package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
