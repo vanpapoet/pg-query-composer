@@ -215,7 +215,8 @@ export function jsonbSet(
   validateIdentifier(column);
   for (const p of path) validateIdentifier(p);
   const pathArray = "'{" + path.join(',') + "}'";
-  const jsonValue = JSON.stringify(value);
+  // Escape single quotes in JSON value to prevent SQL injection
+  const jsonValue = JSON.stringify(value).replace(/'/g, "''");
   return 'jsonb_set(' + column + ', ' + pathArray + ", '" + jsonValue + "'::jsonb, " + createMissing + ')';
 }
 
