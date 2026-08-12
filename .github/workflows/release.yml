@@ -6,25 +6,47 @@ on:
       - "v*"
 
 permissions:
-  contents: write
-  id-token: write
+  contents: write # gh release create
+  id-token: write # npm Trusted Publishing (OIDC) + provenance
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    environment: prod
     steps:
       - uses: actions/checkout@v4
+
+      # No `registry-url`: that writes an .npmrc expecting NODE_AUTH_TOKEN,
+      # which would shadow the OIDC exchange and fail with ENEEDAUTH.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-          registry-url: https://registry.npmjs.org
+
+      # Trusted Publishing needs npm >= 11.5.1; Node 22 still bundles npm 10.
+      - run: npm i -g npm@latest
+
+      # Fail before building if the tag and the manifest disagree — publishing
+      # v1.1.0 from a 1.0.9 manifest cannot be undone once it reaches npm.
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $PKG"
+            exit 1
+          fi
+          echo "releasing $PKG"
+
       - run: npm ci
+      - run: npm run lint
       - run: npm run build
       - run: npm test
-      - run: npm publish --provenance --access public
+
+      # Trusted Publishing: no token in the repo. Provenance is generated from
+      # the OIDC claims, so --provenance is implicit.
+      - run: npm publish --access public
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create ${{ github.ref_name }} --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes

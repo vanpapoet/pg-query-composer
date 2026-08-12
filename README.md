@@ -28,7 +28,7 @@ Advanced PostgreSQL query builder for TypeScript with dynamic composition, type 
 npm install pg-query-composer zod
 ```
 
-**Requirements:** Node.js 18+, TypeScript 5.4+, PostgreSQL 12+ (built with TypeScript 7.0)
+**Requirements:** Node.js 20+, TypeScript 5.4+, PostgreSQL 12+ (built with TypeScript 7.0)
 
 ## Quick Start
 
@@ -324,7 +324,7 @@ npm run test:watch    # Watch mode
 
 286 test cases across 23 files, including 59 dedicated SQL injection prevention
 tests plus guards over the published `exports` map and the version constant.
-Verified against TypeScript 7.0 on Node 18, 20 and 22.
+Verified against TypeScript 7.0 on Node 20 and 22.
 
 ## Contributing
 
