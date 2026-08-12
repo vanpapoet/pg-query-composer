@@ -6,8 +6,7 @@
  */
 
 import { validateIdentifier } from '../core/identifier-validation';
-
-type RawFilter = { __raw: string; __rawValues?: unknown[] };
+import { rawFilter, type RawFilter } from '../core/raw-filter';
 
 // Whitelist of valid PG text search configurations
 const VALID_FTS_CONFIGS = new Set([
@@ -52,10 +51,7 @@ export function fullTextSearch(
 ): RawFilter {
   validateIdentifier(column);
   validateFtsConfig(config);
-  return {
-    __raw: column + " @@ plainto_tsquery('" + config + "', ?)",
-    __rawValues: [query],
-  };
+  return rawFilter(column + " @@ plainto_tsquery('" + config + "', ?)", [query]);
 }
 
 /**
@@ -81,10 +77,7 @@ export function fullTextWebSearch(
 ): RawFilter {
   validateIdentifier(column);
   validateFtsConfig(config);
-  return {
-    __raw: column + " @@ websearch_to_tsquery('" + config + "', ?)",
-    __rawValues: [query],
-  };
+  return rawFilter(column + " @@ websearch_to_tsquery('" + config + "', ?)", [query]);
 }
 
 /**
@@ -110,10 +103,7 @@ export function fullTextRawSearch(
 ): RawFilter {
   validateIdentifier(column);
   validateFtsConfig(config);
-  return {
-    __raw: column + " @@ to_tsquery('" + config + "', ?)",
-    __rawValues: [query],
-  };
+  return rawFilter(column + " @@ to_tsquery('" + config + "', ?)", [query]);
 }
 
 /**

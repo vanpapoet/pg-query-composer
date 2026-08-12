@@ -37,10 +37,9 @@ describe('whereIn() with subquery', () => {
       .whereIn('league_id', ['uuid1', 'uuid2', 'uuid3']);
 
     const { text, values } = qc.toParam();
-    expect(text).toContain('league_id IN');
-    expect(values).toContain('uuid1');
-    expect(values).toContain('uuid2');
-    expect(values).toContain('uuid3');
+    expect(text).toContain('league_id = ANY(');
+    // Whole list binds as one array parameter
+    expect(values).toEqual([['uuid1', 'uuid2', 'uuid3']]);
   });
 
   it('chains with other where conditions', () => {
@@ -81,8 +80,7 @@ describe('whereNotIn() with subquery', () => {
       .whereNotIn('league_id', ['uuid-deleted', 'uuid-banned']);
 
     const { text, values } = qc.toParam();
-    expect(text).toContain('league_id NOT IN');
-    expect(values).toContain('uuid-deleted');
-    expect(values).toContain('uuid-banned');
+    expect(text).toContain('league_id <> ALL(');
+    expect(values).toEqual([['uuid-deleted', 'uuid-banned']]);
   });
 });

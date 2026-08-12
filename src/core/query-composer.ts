@@ -2,8 +2,9 @@ import * as z from 'zod';
 import { extractZodColumns } from '../utils/zod-utils';
 import { OPERATORS, VALID_OPERATORS_SET } from './operators';
 import { InvalidColumnError, InvalidOperatorError } from './errors';
-import { validateIdentifier } from './identifier-validation';
-import { SelectBuilder } from './sql-builder';
+import { validateIdentifier, validateColumnName } from './identifier-validation';
+import { isRawFilter } from './raw-filter';
+import { SelectBuilder, toPlaceholders } from './sql-builder';
 import type {
   QueryOperator,
   QueryBuilderOptions,
@@ -170,30 +171,41 @@ export class QueryComposer {
 
   /**
    * Add WHERE conditions (AND logic)
+   *
+   * Accepts a plain filter object (`{ age__gte: 18 }`) and/or a branded raw
+   * filter produced by the JSONB/FTS/EXISTS helpers. A `__raw` key that is NOT
+   * branded — i.e. anything reaching here from untrusted input such as
+   * `req.query` — is treated as an ordinary column name and rejected by the
+   * whitelist, so raw SQL cannot be smuggled through user-supplied filters.
    */
   where(filters: Record<string, unknown>): this {
     const sep = this.options.separator;
     const sepLen = sep.length;
 
-    for (const key in filters) {
+    // Expand branded raw filters (jsonbContains, fullTextSearch, exists, ...)
+    const branded = isRawFilter(filters);
+    if (branded) {
+      const rawValues = filters['__rawValues'];
+      this.whereRaw(filters['__raw'] as string, Array.isArray(rawValues) ? rawValues : []);
+    }
+
+    // Own enumerable keys only — `for...in` would walk the prototype chain and
+    // let prototype pollution inject conditions into every query.
+    for (const key of Object.keys(filters)) {
       const value = filters[key];
       if (value === undefined) continue;
 
-      // Handle raw conditions with optional parameterized values
-      if (key === '__raw' && typeof value === 'string') {
-        const rawValues = filters['__rawValues'];
-        this.whereRaw(value, Array.isArray(rawValues) ? rawValues as unknown[] : []);
-        continue;
-      }
-      // Skip __rawValues key (consumed by __raw handler above)
-      if (key === '__rawValues') continue;
+      // Consumed above; when unbranded these fall through and fail the whitelist
+      if (branded && (key === '__raw' || key === '__rawValues')) continue;
 
       const sepIdx = key.indexOf(sep);
       const column = sepIdx === -1 ? key : key.slice(0, sepIdx);
       const operator = (sepIdx === -1 ? 'exact' : key.slice(sepIdx + sepLen)) as QueryOperator;
 
       if (!this.whitelistSet.has(column)) {
-        if (this.options.strict) throw new InvalidColumnError(column, this.whitelist);
+        // Report the raw key when the separator split leaves an empty column
+        // (e.g. a smuggled `__raw` key), otherwise the error names nothing.
+        if (this.options.strict) throw new InvalidColumnError(column || key, this.whitelist);
         continue;
       }
       if (!VALID_OPERATORS_SET.has(operator)) {
@@ -229,7 +241,7 @@ export class QueryComposer {
     const sepLen = sep.length;
 
     for (const filters of filterGroups) {
-      for (const key in filters) {
+      for (const key of Object.keys(filters)) {
         const value = filters[key];
         if (value === undefined) continue;
 
@@ -238,7 +250,9 @@ export class QueryComposer {
         const operator = (sepIdx === -1 ? 'exact' : key.slice(sepIdx + sepLen)) as QueryOperator;
 
         if (!this.whitelistSet.has(column)) {
-          if (this.options.strict) throw new InvalidColumnError(column, this.whitelist);
+          // Report the raw key when the separator split leaves an empty column
+          // (e.g. a smuggled `__raw` key), otherwise the error names nothing.
+          if (this.options.strict) throw new InvalidColumnError(column || key, this.whitelist);
           continue;
         }
         if (!VALID_OPERATORS_SET.has(operator)) {
@@ -263,7 +277,7 @@ export class QueryComposer {
     const sep = this.options.separator;
     const sepLen = sep.length;
 
-    for (const key in filters) {
+    for (const key of Object.keys(filters)) {
       const value = filters[key];
       if (value === undefined) continue;
 
@@ -272,7 +286,9 @@ export class QueryComposer {
       const operator = (sepIdx === -1 ? 'exact' : key.slice(sepIdx + sepLen)) as QueryOperator;
 
       if (!this.whitelistSet.has(column)) {
-        if (this.options.strict) throw new InvalidColumnError(column, this.whitelist);
+        // Report the raw key when the separator split leaves an empty column
+        // (e.g. a smuggled `__raw` key), otherwise the error names nothing.
+        if (this.options.strict) throw new InvalidColumnError(column || key, this.whitelist);
         continue;
       }
       if (!VALID_OPERATORS_SET.has(operator)) {
@@ -293,11 +309,12 @@ export class QueryComposer {
    * Add WHERE IN with subquery or array values.
    * Subqueries preserve parameterization (no inline value interpolation).
    */
-  whereIn(column: string, subqueryOrValues: QueryComposer | unknown[]): this {
+  whereIn(column: string, subqueryOrValues: QueryComposer | readonly unknown[]): this {
+    validateColumnName(column);
     if (subqueryOrValues instanceof QueryComposer) {
       const { text, values } = subqueryOrValues.toParam();
       // Convert $N placeholders back to ? for re-numbering by outer query
-      const rawText = text.replace(/\$\d+/g, '?');
+      const rawText = toPlaceholders(text);
       this.whereRaw(column + ' IN (' + rawText + ')', values);
     } else {
       this.where({ [column + '__in']: subqueryOrValues });
@@ -309,11 +326,12 @@ export class QueryComposer {
    * Add WHERE NOT IN with subquery or array values.
    * Subqueries preserve parameterization (no inline value interpolation).
    */
-  whereNotIn(column: string, subqueryOrValues: QueryComposer | unknown[]): this {
+  whereNotIn(column: string, subqueryOrValues: QueryComposer | readonly unknown[]): this {
+    validateColumnName(column);
     if (subqueryOrValues instanceof QueryComposer) {
       const { text, values } = subqueryOrValues.toParam();
       // Convert $N placeholders back to ? for re-numbering by outer query
-      const rawText = text.replace(/\$\d+/g, '?');
+      const rawText = toPlaceholders(text);
       this.whereRaw(column + ' NOT IN (' + rawText + ')', values);
     } else {
       this.where({ [column + '__notin']: subqueryOrValues });
@@ -592,21 +610,6 @@ export class QueryComposer {
       }
     }
     return query;
-  }
-
-  private getSelectFields(): string[] {
-    if (this.selectedFields.length > 0) {
-      return this.selectedFields;
-    }
-
-    // Short-circuit when no fields excluded (common case)
-    if (!this.excludedFields || this.excludedFields.size === 0) {
-      return this.whitelist as string[];
-    }
-
-    return this.whitelist.filter(
-      (f) => !this.excludedFields!.has(f)
-    ) as string[];
   }
 
   /**

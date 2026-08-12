@@ -2,12 +2,20 @@ import type { QueryComposer } from '../core/query-composer';
 
 /**
  * Scope callback type
+ *
+ * `T` is a phantom type parameter: it documents the model a scope targets and
+ * is part of the published API surface, so it stays even though the callback
+ * signature does not reference it.
  */
+// eslint-disable-next-line no-unused-vars
 export type ScopeCallback<T> = (qc: QueryComposer) => QueryComposer;
 
 /**
  * Scope definition
+ *
+ * `T` is a phantom type parameter — see {@link ScopeCallback}.
  */
+// eslint-disable-next-line no-unused-vars
 export interface Scope<T> {
   apply: (qc: QueryComposer) => QueryComposer;
 }

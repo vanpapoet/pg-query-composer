@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import { QueryComposer } from '../../src/core/query-composer';
 import { validateIdentifier } from '../../src/core/identifier-validation';
+import { InvalidColumnError } from '../../src/core/errors';
 import {
   jsonbContains,
   jsonbContainedBy,
@@ -152,7 +153,8 @@ describe('Value Parameterization', () => {
       .where({ status__in: ["active", "'; DROP TABLE users;--"] });
     const { text, values } = qc.toParam();
     expect(text).not.toContain('DROP TABLE');
-    expect(values).toContain("'; DROP TABLE users;--");
+    // `= ANY(?)` binds the whole list as one array parameter
+    expect(values).toEqual([['active', "'; DROP TABLE users;--"]]);
   });
 
   it('parameterizes BETWEEN values', () => {
@@ -423,5 +425,157 @@ describe('Pagination Safety', () => {
     const meta = qc.getPaginationMeta();
     expect(meta.page).toBe(1);
     expect(meta.offset).toBe(0);
+  });
+});
+
+// ============================================================
+// RAW FILTER SMUGGLING
+// Regression: `where()` accepts user-supplied filter objects, so a plain
+// `__raw` key must never be honoured as raw SQL.
+// ============================================================
+
+describe('Raw Filter Smuggling Prevention', () => {
+  it('rejects a __raw key coming from untrusted input', () => {
+    const hostile = JSON.parse('{"__raw":"1=1 OR (SELECT 1)=1"}');
+    expect(() => new QueryComposer(UserSchema, 'users').where(hostile)).toThrow(
+      InvalidColumnError
+    );
+  });
+
+  it('rejects __rawValues smuggling', () => {
+    const hostile = JSON.parse('{"__rawValues":["x"]}');
+    expect(() => new QueryComposer(UserSchema, 'users').where(hostile)).toThrow(
+      InvalidColumnError
+    );
+  });
+
+  it('ignores __raw injected via Object.prototype', () => {
+    (Object.prototype as Record<string, unknown>).__raw = '1=1 --';
+    try {
+      const { text } = new QueryComposer(UserSchema, 'users').where({ id: 1 }).toParam();
+      expect(text).toBe('SELECT * FROM users WHERE id = $1');
+      expect(text).not.toContain('1=1');
+    } finally {
+      delete (Object.prototype as Record<string, unknown>).__raw;
+    }
+  });
+
+  it('still honours branded raw filters from library helpers', () => {
+    const { text, values } = new QueryComposer(UserSchema, 'users')
+      .where(jsonbContains('data', { role: 'admin' }))
+      .toParam();
+    expect(text).toBe('SELECT * FROM users WHERE data @> $1::jsonb');
+    expect(values).toEqual(['{"role":"admin"}']);
+  });
+
+  it('supports mixing a branded raw filter with normal columns', () => {
+    const { text, values } = new QueryComposer(UserSchema, 'users')
+      .where({ ...jsonbContains('data', { role: 'admin' }), status: 'active' })
+      .toParam();
+    expect(text).toContain('data @> $1::jsonb');
+    expect(text).toContain('status = $2');
+    expect(values).toEqual(['{"role":"admin"}', 'active']);
+  });
+});
+
+// ============================================================
+// whereIn / whereNotIn COLUMN VALIDATION
+// ============================================================
+
+describe('whereIn Column Validation', () => {
+  it('rejects injection via whereIn column with a subquery', () => {
+    const sub = subquery(UserSchema, 'admins').select(['id']);
+    expect(() =>
+      new QueryComposer(UserSchema, 'users').whereIn('1=1) OR (1', sub)
+    ).toThrow(/Unsafe column name/);
+  });
+
+  it('rejects injection via whereNotIn column with a subquery', () => {
+    const sub = subquery(UserSchema, 'admins').select(['id']);
+    expect(() =>
+      new QueryComposer(UserSchema, 'users').whereNotIn("id') OR 1=1--", sub)
+    ).toThrow(/Unsafe column name/);
+  });
+
+  it('rejects injection via whereIn column with array values', () => {
+    expect(() =>
+      new QueryComposer(UserSchema, 'users').whereIn('1=1) OR (1', [1, 2])
+    ).toThrow(/Unsafe column name/);
+  });
+
+  it('allows safe qualified column names', () => {
+    const { text } = new QueryComposer(UserSchema, 'users', {
+      extraColumns: ['users.id'],
+    })
+      .whereIn('users.id', [1, 2])
+      .toParam();
+    expect(text).toContain('users.id = ANY(');
+  });
+});
+
+// ============================================================
+// JSONB KEY-EXISTENCE OPERATORS vs PARAMETER PLACEHOLDERS
+// Regression: PG uses ?, ?& and ?| as operators — they must survive
+// placeholder substitution instead of being consumed as parameters.
+// ============================================================
+
+describe('JSONB Operator / Placeholder Collision', () => {
+  it('emits a literal ? operator for jsonbHasKey', () => {
+    const { text, values } = new QueryComposer(UserSchema, 'users')
+      .where(jsonbHasKey('data', 'status'))
+      .toParam();
+    expect(text).toBe('SELECT * FROM users WHERE data ? $1');
+    expect(values).toEqual(['status']);
+  });
+
+  it('emits a literal ?& operator for jsonbHasAllKeys', () => {
+    const { text, values } = new QueryComposer(UserSchema, 'users')
+      .where(jsonbHasAllKeys('data', ['a', 'b']))
+      .toParam();
+    expect(text).toBe('SELECT * FROM users WHERE data ?& array[$1, $2]');
+    expect(values).toEqual(['a', 'b']);
+  });
+
+  it('emits a literal ?| operator for jsonbHasAnyKey', () => {
+    const { text, values } = new QueryComposer(UserSchema, 'users')
+      .where(jsonbHasAnyKey('data', ['a', 'b']))
+      .toParam();
+    expect(text).toBe('SELECT * FROM users WHERE data ?| array[$1, $2]');
+    expect(values).toEqual(['a', 'b']);
+  });
+
+  it('keeps parameter numbering correct around JSONB operators', () => {
+    const { text, values } = new QueryComposer(UserSchema, 'users')
+      .where({ status: 'active' })
+      .where(jsonbHasAnyKey('data', ['a', 'b']))
+      .where({ name: 'x' })
+      .toParam();
+    expect(text).toBe(
+      'SELECT * FROM users WHERE status = $1 AND data ?| array[$2, $3] AND name = $4'
+    );
+    expect(values).toEqual(['active', 'a', 'b', 'x']);
+  });
+
+  it('preserves JSONB operators when nested in a subquery', () => {
+    const sub = subquery(UserSchema, 'admins')
+      .select(['id'])
+      .where(jsonbHasKey('data', 'root'));
+    const { text, values } = new QueryComposer(UserSchema, 'users')
+      .where({ status: 'active' })
+      .whereIn('id', sub)
+      .toParam();
+    expect(text).toBe(
+      'SELECT * FROM users WHERE status = $1 AND id IN (SELECT id FROM admins WHERE data ? $2)'
+    );
+    expect(values).toEqual(['active', 'root']);
+  });
+
+  it('preserves JSONB operators inside EXISTS', () => {
+    const sub = subquery(UserSchema, 'admins').where(jsonbHasKey('data', 'root'));
+    const { text, values } = new QueryComposer(UserSchema, 'users')
+      .where(exists(sub))
+      .toParam();
+    expect(text).toContain('data ? $1');
+    expect(values).toEqual(['root']);
   });
 });

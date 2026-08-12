@@ -28,3 +28,27 @@ export function validateIdentifier(identifier: string): void {
     );
   }
 }
+
+// Strict pattern for bare column references: `col` or `table.col` / `schema.table.col`.
+// Deliberately narrower than SAFE_SQL_EXPR_RE — that one permits spaces,
+// parentheses and `=`, which is enough to build `1=1) OR (1` or `(SELECT ...)`
+// without ever using a quote.
+const COLUMN_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/;
+
+/**
+ * Validate that a string is a bare column reference.
+ *
+ * Use wherever a column name is concatenated into SQL outside the schema
+ * whitelist (e.g. the subquery branch of `whereIn`), where the looser
+ * `validateIdentifier` would let an expression through.
+ *
+ * @param column - The column reference to validate
+ * @throws Error if the column is not a plain (optionally qualified) identifier
+ */
+export function validateColumnName(column: string): void {
+  if (!column || !COLUMN_NAME_RE.test(column)) {
+    throw new Error(
+      `Unsafe column name: "${column}". Expected a plain identifier such as "col" or "table.col".`
+    );
+  }
+}

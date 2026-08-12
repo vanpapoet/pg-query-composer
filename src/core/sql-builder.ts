@@ -18,8 +18,23 @@ export interface ParamResult {
 interface PIdx { v: number }
 
 /**
+ * Escape literal `?` characters in a SQL fragment so they survive placeholder
+ * substitution, then convert `$N` parameters back to `?` placeholders.
+ *
+ * Used when embedding an already-built subquery into an outer query: the outer
+ * builder re-numbers `?` placeholders, so any literal `?` the subquery contains
+ * (e.g. the JSONB `?` / `?&` / `?|` operators) must be escaped to `??` first.
+ */
+export function toPlaceholders(sql: string): string {
+  return sql.replace(/\?/g, '??').replace(/\$\d+/g, '?');
+}
+
+/**
  * Replace ? placeholders with $N. Module-level to avoid closure allocation.
- * Fast-paths for 0 and 1 value (covers ~80% of operator calls).
+ *
+ * `??` is an escape for a literal `?` — required because PostgreSQL uses `?`,
+ * `?&` and `?|` as JSONB key-existence operators, which would otherwise be
+ * consumed as parameter placeholders.
  */
 function replaceParams(
   clause: string,
@@ -27,33 +42,40 @@ function replaceParams(
   pidx: PIdx,
   allValues: unknown[]
 ): string {
-  const vlen = values.length;
+  const qIdx = clause.indexOf('?');
 
-  // Fast path: no parameters (isnull, today, thisweek, etc.)
-  if (vlen === 0) return clause;
+  // Fast path: no placeholders at all (isnull, today, thisweek, etc.)
+  if (qIdx === -1) return clause;
 
-  // Fast path: single parameter (exact, gt, gte, lt, lte, contains, etc.)
-  if (vlen === 1) {
-    const qIdx = clause.indexOf('?');
-    if (qIdx === -1) return clause;
+  // Fast path: exactly one '?' in the clause — a lone '?' can never be a `??`
+  // escape, so it is unambiguously a placeholder.
+  if (values.length === 1 && clause.indexOf('?', qIdx + 1) === -1) {
     pidx.v++;
     allValues.push(values[0]);
     return clause.slice(0, qIdx) + '$' + pidx.v + clause.slice(qIdx + 1);
   }
 
-  // General path: multiple parameters
+  // General path: handle `??` escapes and multiple parameters
   let vi = 0;
   let result = '';
   let lastIdx = 0;
   for (let i = 0; i < clause.length; i++) {
-    if (clause.charCodeAt(i) === 63) { // '?'
-      pidx.v++;
-      allValues.push(values[vi++]);
-      result += clause.slice(lastIdx, i) + '$' + pidx.v;
+    if (clause.charCodeAt(i) !== 63) continue; // not '?'
+
+    if (clause.charCodeAt(i + 1) === 63) {
+      // `??` → literal '?' (JSONB operator), consumes no value
+      result += clause.slice(lastIdx, i) + '?';
+      i++; // skip the second '?'
       lastIdx = i + 1;
+      continue;
     }
+
+    pidx.v++;
+    allValues.push(values[vi++]);
+    result += clause.slice(lastIdx, i) + '$' + pidx.v;
+    lastIdx = i + 1;
   }
-  return lastIdx === 0 ? clause : result + clause.slice(lastIdx);
+  return result + clause.slice(lastIdx);
 }
 
 /**

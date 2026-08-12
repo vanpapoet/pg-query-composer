@@ -37,7 +37,7 @@ export function subquery(
   schema: z.ZodTypeAny,
   table: string
 ): QueryComposer {
-  return new QueryComposer(schema, table, { strict: false });
+  return new QueryComposer(schema, table);
 }
 
 /**
@@ -61,7 +61,7 @@ export function subqueryAs(
 ): { query: QueryComposer; alias: string } {
   validateIdentifier(alias);
   return {
-    query: new QueryComposer(schema, table + ' AS ' + alias, { strict: false }),
+    query: new QueryComposer(schema, table + ' AS ' + alias),
     alias,
   };
 }

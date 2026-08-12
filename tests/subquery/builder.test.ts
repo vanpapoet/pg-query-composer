@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as z from 'zod';
 import { subquery } from '../../src/subquery/builder';
+import { InvalidColumnError } from '../../src/core/errors';
 
 const LeagueSchema = z.object({
   id: z.string(),
@@ -51,15 +52,11 @@ describe('subquery()', () => {
     expect(values).toContain('%Liga%');
   });
 
-  it('always uses strict: false', () => {
-    // Should not throw even with unknown column
-    const sq = subquery(LeagueSchema, 'leagues')
-      .select(['id'])
-      .where({ unknown_field: 'value' });
-
-    // Should still generate valid SQL, just without the unknown field
-    const sql = sq.toSQL();
-    expect(sql).toContain('SELECT');
-    expect(sql).toContain('FROM leagues');
+  it('enforces the schema whitelist (strict by default)', () => {
+    // Unknown columns must be rejected, not silently dropped — the caller
+    // supplies the schema, so there is no reason to weaken validation here.
+    expect(() =>
+      subquery(LeagueSchema, 'leagues').select(['id']).where({ unknown_field: 'value' })
+    ).toThrow(InvalidColumnError);
   });
 });

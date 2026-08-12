@@ -52,5 +52,11 @@ export function mergeAll(queries: QueryComposer[]): QueryComposer {
     throw new Error('mergeAll requires at least one QueryComposer');
   }
 
-  return queries.reduce((acc, qc) => merge(acc, qc));
+  // Clone once, then merge in place. Reducing with merge() would clone a
+  // progressively larger accumulator on every step — O(n^2) copying.
+  const merged = queries[0].clone();
+  for (let i = 1; i < queries.length; i++) {
+    merged.mergeFrom(queries[i]);
+  }
+  return merged;
 }

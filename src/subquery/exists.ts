@@ -1,5 +1,7 @@
 import { QueryComposer } from '../core/query-composer';
 import { validateIdentifier } from '../core/identifier-validation';
+import { rawFilter, type RawFilter } from '../core/raw-filter';
+import { toPlaceholders } from '../core/sql-builder';
 
 /**
  * Create EXISTS condition for use in where()
@@ -22,12 +24,12 @@ import { validateIdentifier } from '../core/identifier-validation';
  * // Generates: WHERE EXISTS (SELECT 1 FROM comments WHERE ... AND approved = $N)
  * ```
  */
-export function exists(subquery: QueryComposer): Record<string, unknown> {
+export function exists(subquery: QueryComposer): RawFilter {
   const { text, values } = subquery.toParam();
   const existsSql = convertToExists(text);
   // Convert $N placeholders to ? for re-numbering by outer query
-  const rawText = existsSql.replace(/\$\d+/g, '?');
-  return { __raw: 'EXISTS (' + rawText + ')', __rawValues: values };
+  const rawText = toPlaceholders(existsSql);
+  return rawFilter('EXISTS (' + rawText + ')', values);
 }
 
 /**
@@ -49,11 +51,11 @@ export function exists(subquery: QueryComposer): Record<string, unknown> {
  * // Generates: WHERE NOT EXISTS (SELECT 1 FROM comments WHERE ...)
  * ```
  */
-export function notExists(subquery: QueryComposer): Record<string, unknown> {
+export function notExists(subquery: QueryComposer): RawFilter {
   const { text, values } = subquery.toParam();
   const existsSql = convertToExists(text);
-  const rawText = existsSql.replace(/\$\d+/g, '?');
-  return { __raw: 'NOT EXISTS (' + rawText + ')', __rawValues: values };
+  const rawText = toPlaceholders(existsSql);
+  return rawFilter('NOT EXISTS (' + rawText + ')', values);
 }
 
 /**

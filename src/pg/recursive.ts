@@ -36,9 +36,7 @@ export class RecursiveCTEBuilder<T extends z.ZodTypeAny> {
    * ```
    */
   baseCase(queryFn: (qc: QueryComposer) => QueryComposer): this {
-    const qc = new QueryComposer(this.schema, this.sourceTable || 'source', {
-      strict: false,
-    });
+    const qc = new QueryComposer(this.schema, this.sourceTable || 'source');
     this.baseQuery = queryFn(qc);
     return this;
   }
@@ -74,7 +72,7 @@ export class RecursiveCTEBuilder<T extends z.ZodTypeAny> {
     this.sourceTable = table;
     // Update base query table if already set
     if (this.baseQuery) {
-      const qc = new QueryComposer(this.schema, table, { strict: false });
+      const qc = new QueryComposer(this.schema, table);
       // Re-apply the base case with correct table
       this.baseQuery = qc;
     }

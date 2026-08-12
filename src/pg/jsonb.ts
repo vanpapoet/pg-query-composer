@@ -6,8 +6,8 @@
  */
 
 import { validateIdentifier } from '../core/identifier-validation';
-
-type RawFilter = { __raw: string; __rawValues?: unknown[] };
+import { placeholders } from '../core/operators';
+import { rawFilter, type RawFilter } from '../core/raw-filter';
 
 /**
  * JSONB contains operator (@>)
@@ -26,7 +26,7 @@ type RawFilter = { __raw: string; __rawValues?: unknown[] };
  */
 export function jsonbContains(column: string, value: unknown): RawFilter {
   validateIdentifier(column);
-  return { __raw: column + ' @> ?::jsonb', __rawValues: [JSON.stringify(value)] };
+  return rawFilter(column + ' @> ?::jsonb', [JSON.stringify(value)]);
 }
 
 /**
@@ -40,7 +40,7 @@ export function jsonbContains(column: string, value: unknown): RawFilter {
  */
 export function jsonbContainedBy(column: string, value: unknown): RawFilter {
   validateIdentifier(column);
-  return { __raw: column + ' <@ ?::jsonb', __rawValues: [JSON.stringify(value)] };
+  return rawFilter(column + ' <@ ?::jsonb', [JSON.stringify(value)]);
 }
 
 /**
@@ -60,7 +60,7 @@ export function jsonbContainedBy(column: string, value: unknown): RawFilter {
  */
 export function jsonbHasKey(column: string, key: string): RawFilter {
   validateIdentifier(column);
-  return { __raw: column + ' ? ?', __rawValues: [key] };
+  return rawFilter(column + ' ?? ?', [key]);
 }
 
 /**
@@ -80,8 +80,7 @@ export function jsonbHasKey(column: string, key: string): RawFilter {
  */
 export function jsonbHasAllKeys(column: string, keys: string[]): RawFilter {
   validateIdentifier(column);
-  const placeholders = keys.map(() => '?').join(', ');
-  return { __raw: column + ' ?& array[' + placeholders + ']', __rawValues: keys };
+  return rawFilter(column + ' ??& array[' + placeholders(keys.length) + ']', keys);
 }
 
 /**
@@ -101,8 +100,7 @@ export function jsonbHasAllKeys(column: string, keys: string[]): RawFilter {
  */
 export function jsonbHasAnyKey(column: string, keys: string[]): RawFilter {
   validateIdentifier(column);
-  const placeholders = keys.map(() => '?').join(', ');
-  return { __raw: column + ' ?| array[' + placeholders + ']', __rawValues: keys };
+  return rawFilter(column + ' ??| array[' + placeholders(keys.length) + ']', keys);
 }
 
 /**
