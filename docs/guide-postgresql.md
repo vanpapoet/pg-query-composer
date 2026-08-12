@@ -279,7 +279,7 @@ cte
   .recursiveCase('categories', 'tree.id = categories.parent_id')
   .withDepth();
 
-const { text } = cte.build();
+const { text } = cte.toParam();
 console.log(text);
 // → WITH RECURSIVE tree AS (SELECT * FROM categories WHERE parent_id IS NULL UNION ALL SELECT * FROM categories INNER JOIN tree ON tree.id = categories.parent_id) SELECT * FROM tree
 ```

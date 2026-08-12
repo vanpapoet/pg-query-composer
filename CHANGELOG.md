@@ -5,7 +5,12 @@ All notable changes to **pg-query-composer** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-08-12
+
+> Shipped as a minor despite the two breaking items below: every subpath import
+> was broken in 1.0.2, so no consumer can have depended on `toParam().values`
+> shape from `/relations` or `groupByKey()`. Check the Breaking section before
+> upgrading if you imported from the root entry.
 
 ### Breaking
 
@@ -19,6 +24,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Every subpath import was broken.** `exports` mapped `./composition`, `./subquery`,
+  `./relations` and `./pg` to `./dist/<mod>/index.js`, but no `src/<mod>/index.ts`
+  existed, so consumers got `MODULE_NOT_FOUND`; `./types` was documented in the
+  README yet absent from the map entirely (`ERR_PACKAGE_PATH_NOT_EXPORTED`). Each
+  module now has a barrel, `./types` is exported, and every entry carries a `types`
+  condition so TypeScript's `node16` resolution finds the declarations. The root
+  entry re-exports the barrels, so both import styles reach the same binding.
+  `tests/package/exports-map.test.ts` fails the build if the map and the sources
+  drift again.
+- `RawFilter` — the return type of every JSONB / FTS / EXISTS helper — was not
+  exported, so consumers could not annotate their own helpers. `rawFilter()`,
+  `isRawFilter()` and the type are now public.
+- README documented an API that never existed: `defineModel('User', {...})`,
+  `createModelQuery(model, table)`, `.include(rel, { limit })` and a `.build()`
+  method. Examples now match the real signatures and their output is copied from
+  actual runs (`ILIKE` not `LIKE`, parameterized `LIMIT`/`OFFSET`, array `jsonbPath`
+  paths, `ancestorsCTE(table, schema, startId)`).
+- CI and release workflows ran a hand-listed set of test directories, silently
+  skipping any newly added suite. Both now run `npm test`.
 - Relations silently resolved to `[]` / `null` whenever the primary key was
   numeric: parent keys were stringified while child keys kept their `number` type,
   so the grouping `Map` never matched. Keys are now normalized on both sides, and

@@ -4,12 +4,21 @@
  * Advanced PostgreSQL query builder with dynamic composition,
  * subqueries, relations, and type-safe queries.
  *
+ * The root entry point re-exports every module barrel, so
+ * `import { jsonbContains } from 'pg-query-composer'` and
+ * `import { jsonbContains } from 'pg-query-composer/pg'` resolve to the same
+ * binding. Barrels are the single source of truth for what each subpath
+ * exports — keeping the list here would only drift.
+ *
  * @packageDocumentation
  */
 
-export const VERSION = '1.0.2';
+export const VERSION = '1.1.0';
 
-// Core exports
+// ===========================================================================
+// CORE
+// ===========================================================================
+
 export { QueryComposer, createQueryComposer } from './core/query-composer';
 export type {
   QueryOperator,
@@ -40,117 +49,24 @@ export {
   QueryComposerError,
 } from './core/errors';
 
-// Composition exports
-export { scope, parameterizedScope } from './composition/scope';
-export type { Scope, ScopeCallback } from './composition/scope';
-export {
-  fragment,
-  dateRange,
-  inList,
-  notInList,
-  isNull,
-  isNotNull,
-  contains,
-  startsWith,
-  endsWith,
-  between,
-  greaterThan,
-  greaterThanOrEqual,
-  lessThan,
-  lessThanOrEqual,
-  exact,
-  notEqual,
-} from './composition/fragment';
-export type { FilterFragment } from './composition/fragment';
-export { merge, mergeAll } from './composition/merge';
+// Raw SQL fragments — `RawFilter` is the return type of the JSONB / FTS /
+// EXISTS helpers, so consumers need it to annotate their own helpers.
+export { rawFilter, isRawFilter } from './core/raw-filter';
+export type { RawFilter } from './core/raw-filter';
 
-// Subquery exports
-export { subquery, subqueryAs, rawSubquery } from './subquery/builder';
-export { exists, notExists, ref, raw, lateral } from './subquery/exists';
+// ===========================================================================
+// MODULE BARRELS (also available as subpath imports)
+// ===========================================================================
 
-// Relations exports
-export {
-  defineModel,
-  getModel,
-  hasRelation,
-  getRelation,
-  getRelationNames,
-  clearModelRegistry,
-  getAllModels,
-} from './relations/define';
-export {
-  createModelQuery,
-  ModelQueryComposer,
-  normalizeIncludeOptions,
-} from './relations/include';
-export type {
-  RelationType,
-  BelongsToRelation,
-  HasOneRelation,
-  HasManyRelation,
-  HasManyThroughRelation,
-  RelationConfig,
-  ModelDefinition,
-  IncludeOptions,
-  LoadedRelation,
-} from './relations/types';
-export {
-  createRelationLoader,
-  batchLoadBelongsTo,
-  batchLoadHasMany,
-  groupByKey,
-  createAllRelationLoaders,
-  loadRelation,
-} from './relations/loader';
-export type { QueryExecutor, RelationKey, BatchLoadConfig } from './relations/loader';
+export * from './composition';
+export * from './subquery';
+export * from './relations';
+export * from './types';
+export * from './pg';
 
-// Type-safe exports
-export { TypedQueryComposer, createTypedComposer, typedFilter } from './types/infer';
-export type {
-  InferColumns,
-  InferZodType,
-  TypedWhere,
-  TypedSelect,
-  TypedOrderBy,
-  InferResult,
-} from './types/infer';
+// ===========================================================================
+// UTILITIES
+// ===========================================================================
 
-// PostgreSQL-specific exports
-export {
-  jsonbContains,
-  jsonbContainedBy,
-  jsonbHasKey,
-  jsonbHasAllKeys,
-  jsonbHasAnyKey,
-  jsonbPath,
-  jsonbPathText,
-  jsonbExtract,
-  jsonbExtractText,
-  jsonbSet,
-  jsonbArrayElements,
-  jsonbObjectKeys,
-} from './pg/jsonb';
-
-export {
-  fullTextSearch,
-  fullTextWebSearch,
-  fullTextRawSearch,
-  fullTextRank,
-  fullTextRankCd,
-  toTsVector,
-  toTsQuery,
-  plainto_tsquery,
-  websearch_to_tsquery,
-  tsHeadline,
-} from './pg/fts';
-
-export {
-  RecursiveCTEBuilder,
-  createRecursiveCTE,
-  ancestorsCTE,
-  descendantsCTE,
-} from './pg/recursive';
-
-// Utility exports
 export { extractZodColumns } from './utils/zod-utils';
 export { validateIdentifier, validateColumnName } from './core/identifier-validation';

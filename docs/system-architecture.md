@@ -135,15 +135,15 @@ SELECT * FROM users,
 
 ```typescript
 // Fixed scope
-const activeScope = scope((q) => q.where('deleted_at__isnull', true));
+const activeScope = scope((q) => q.where({ deleted_at__isnull: true }));
 
-// Parameterized scope
-const recentScope = parameterizedScope((q, params) =>
-  q.where('created_at__gte', params.days_ago)
+// Parameterized scope — the factory returns the scope callback
+const recentScope = parameterizedScope((since: string) =>
+  (q) => q.where({ created_at__gte: since })
 );
 
 // Usage
-composer.applyScope(activeScope).applyScope(recentScope);
+composer.apply(activeScope).apply(recentScope('2024-01-01'));
 ```
 
 **Merge Logic:**
@@ -185,10 +185,10 @@ const userSchema = z.object({
 const typed = createTypedComposer(userSchema, 'users');
 
 // Compile error: 'invalid_col' not in schema
-typed.where('invalid_col__exact', 'value');  // ✗
+typed.where({ invalid_col__exact: 'value' });  // ✗
 
 // Type-safe: 'email' exists in schema
-typed.where('email__contains', 'example.com');  // ✓
+typed.where({ email__contains: 'example.com' });  // ✓
 ```
 
 ### Layer 5: Relations & Eager Loading
@@ -233,16 +233,24 @@ HasManyThroughRelation = {
 **Eager Loading Pattern:**
 
 ```typescript
-const query = createModelQuery(userModel, 'users');
+// The library builds queries; the caller executes them via an executor
+const execute = async ({ text, values }) => (await pool.query(text, values)).rows;
 
-const users = await query
-  .where('status__exact', 'active')
-  .include('posts', { limit: 5 })  // eager load posts
-  .include('profile')              // eager load profile
-  .build();
+const query = createModelQuery(userModel).where({ status__exact: 'active' });
+const users = await execute(query.toParam());
 
-// users[i].posts[j], users[i].profile auto-populated
+// One extra query per relation — never one per row
+const withPosts = await loadRelation(users, userModel, 'posts', execute);
+const withAll = await loadRelation(withPosts, userModel, 'profile', execute);
+
+// withAll[i].posts is an array (hasMany); .profile is a record or null (hasOne)
 ```
+
+`.include(relation, queryFn?)` records a relation filter that
+`getIncludeQueries()` renders as `{ relation, type, foreignKey, primaryKey, query }`.
+That query carries the filter but **not** the parent-key predicate — add the key
+restriction yourself, or use `loadRelation()`, which builds
+`WHERE <fk> = ANY($1)` but ignores the `.include()` callback.
 
 **N+1 Prevention:**
 
@@ -461,23 +469,23 @@ User Code
    ├─ createQueryComposer(schema, 'users')
    │  └─ Extracts columns via extractZodColumns
    │
-   ├─ .where('email__contains', 'example.com')
+   ├─ .where({ email__contains: 'example.com' })
    │  ├─ Parse field__operator
    │  ├─ Validate column against whitelist
    │  ├─ Validate operator against VALID_OPERATORS
    │  ├─ Apply operator handler
    │  └─ Return this
    │
-   ├─ .orderBy('created_at', 'DESC')
-   │  └─ Add sort option
+   ├─ .orderBy('-created_at')
+   │  └─ Add sort option ('-' prefix = DESC)
    │
    ├─ .paginate({ page: 1, limit: 20 })
    │  └─ Add LIMIT/OFFSET metadata
    │
-   └─ .build()
+   └─ .toParam()
       ├─ Generate SQL via SelectBuilder
       ├─ Bind values as $1, $2, ...
-      └─ Return { sql, values }
+      └─ Return { text, values }
 ```
 
 ### Pattern 2: Eager Loading with Relations
@@ -485,25 +493,23 @@ User Code
 ```
 User Code
    │
-   ├─ defineModel('User', { relations: { posts: ... } })
+   ├─ defineModel({ name: 'User', table, schema, relations: { posts: ... } })
    │  └─ Register in model registry
    │
-   ├─ createModelQuery(UserModel, 'users')
+   ├─ createModelQuery(UserModel)
    │  └─ Create ModelQueryComposer
    │
-   ├─ .where('status__exact', 'active')
+   ├─ .where({ status__exact: 'active' })
    │
-   ├─ .include('posts', { limit: 5 })
-   │  ├─ Create DataLoader for posts relation
-   │  ├─ Queue batch loading
-   │  └─ Return this
+   ├─ .toParam() → executor
+   │  └─ Parent rows
    │
-   ├─ .build()
-   │  ├─ Execute main query (get user IDs)
-   │  ├─ DataLoader batches post IDs
-   │  ├─ Execute single batch query
-   │  ├─ Populate posts on each user
-   │  └─ Return users with .posts property
+   └─ loadRelation(rows, UserModel, 'posts', executor)
+      ├─ Collect + dedupe parent keys (normalized for grouping)
+      ├─ getBatchLoadConfig → WHERE user_id = ANY($1)
+      ├─ Execute ONE batch query
+      ├─ groupByKey on the batch key
+      └─ Return rows with .posts attached
 ```
 
 ### Pattern 3: Type-Safe Query
@@ -516,7 +522,7 @@ User Code
    ├─ createTypedComposer(schema, 'users')
    │  └─ Infer column type from schema
    │
-   ├─ .where('email__contains', 'value')
+   ├─ .where({ email__contains: 'value' })
    │  ├─ TypeScript checks 'email' in schema
    │  ├─ TypeScript checks operator valid
    │  └─ Runtime: same as basic flow

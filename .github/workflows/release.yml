@@ -22,7 +22,7 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: npm ci
       - run: npm run build
-      - run: npx vitest run tests/core tests/composition tests/subquery tests/relations tests/pg tests/types tests/integration tests/security
+      - run: npm test
       - run: npm publish --provenance --access public
       - name: Create GitHub Release
         env:
