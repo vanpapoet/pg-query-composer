@@ -318,9 +318,9 @@ function printResults(snap: Snapshot) {
 }
 
 // --- Main ---
-const args = process.argv.slice(2);
-const shouldSave = args.includes('--save');
-const isBaseline = args.includes('--baseline');
+const args = new Set(process.argv.slice(2));
+const shouldSave = args.has('--save');
+const isBaseline = args.has('--baseline');
 
 const snapshot = runBenchmarks();
 printResults(snapshot);

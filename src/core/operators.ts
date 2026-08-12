@@ -13,7 +13,7 @@ export type OperatorHandler = (
  * Uses loop instead of arr.map(() => '?').join(', ') to avoid
  * intermediate array allocation on hot path.
  */
-function placeholders(n: number): string {
+export function placeholders(n: number): string {
   if (n === 1) return '?';
   if (n === 2) return '?, ?';
   if (n === 3) return '?, ?, ?';
@@ -45,15 +45,21 @@ export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
   iregex: (col, val) => [col + ' ~* ?', [val]],
 
   // ===== RANGE OPERATORS =====
+  // Emitted as `= ANY(?)` / `<> ALL(?)` rather than `IN ($1, $2, ...)` so the
+  // SQL text stays identical regardless of list length. A per-length text would
+  // fragment PostgreSQL's plan cache (and node-pg / PgBouncer statement caches)
+  // and hit the 65535 bind-parameter ceiling on large lists.
+  // NULL semantics are unchanged: `NOT IN (list)` and `<> ALL(array)` both
+  // yield unknown when the list contains NULL.
   in: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
     if (arr.length === 0) return ['FALSE', []];
-    return [col + ' IN (' + placeholders(arr.length) + ')', arr];
+    return [col + ' = ANY(?)', [arr]];
   },
   notin: (col, val) => {
     const arr = Array.isArray(val) ? val : [val];
     if (arr.length === 0) return ['TRUE', []];
-    return [col + ' NOT IN (' + placeholders(arr.length) + ')', arr];
+    return [col + ' <> ALL(?)', [arr]];
   },
   between: (col, val) => {
     const arr = Array.isArray(val) ? val : [];

@@ -73,10 +73,16 @@ describe('OPERATORS', () => {
   });
 
   describe('Range Operators', () => {
-    it('in - generates IN clause', () => {
+    it('in - generates = ANY clause with a single array param', () => {
       const [condition, values] = OPERATORS.in('status', ['active', 'pending']);
-      expect(condition).toBe('status IN (?, ?)');
-      expect(values).toEqual(['active', 'pending']);
+      expect(condition).toBe('status = ANY(?)');
+      expect(values).toEqual([['active', 'pending']]);
+    });
+
+    it('in - SQL text is independent of list length (plan cache stability)', () => {
+      const [short] = OPERATORS.in('status', ['a']);
+      const [long] = OPERATORS.in('status', ['a', 'b', 'c', 'd', 'e']);
+      expect(short).toBe(long);
     });
 
     it('in - handles empty array', () => {
@@ -85,10 +91,10 @@ describe('OPERATORS', () => {
       expect(values).toEqual([]);
     });
 
-    it('notin - generates NOT IN clause', () => {
+    it('notin - generates <> ALL clause with a single array param', () => {
       const [condition, values] = OPERATORS.notin('status', ['deleted', 'archived']);
-      expect(condition).toBe('status NOT IN (?, ?)');
-      expect(values).toEqual(['deleted', 'archived']);
+      expect(condition).toBe('status <> ALL(?)');
+      expect(values).toEqual([['deleted', 'archived']]);
     });
 
     it('between - generates BETWEEN clause', () => {
