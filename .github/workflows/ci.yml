@@ -21,4 +21,6 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
-      - run: npx vitest run tests/core tests/composition tests/subquery tests/relations tests/pg tests/types tests/integration tests/security
+      # `npm test` runs every tests/ directory — a hand-listed set silently
+      # skips newly added suites.
+      - run: npm test
