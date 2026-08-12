@@ -77,12 +77,24 @@ ck.md
 
 !.claude/settings.local.json
 
+# local agent/tooling files — kept on disk, never published
 .serena
 .agents
 .claude
-docs
 guide
 scripts
 .repomixignore
 AGENTS.md
 GEMINI.md
+CLAUDE.md
+
+# docs: only the user-facing guides + standards are published
+docs/*
+!docs/guide-*.md
+!docs/code-standards.md
+!docs/system-architecture.md
+
+# benchmark artifacts and internal profiling scripts
+benchmarks/snapshots/
+benchmarks/profile-*.ts
+benchmarks/*-results.tsv

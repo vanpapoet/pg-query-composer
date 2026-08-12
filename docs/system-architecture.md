@@ -20,7 +20,7 @@ pg-query-composer follows a **layered, modular architecture** designed for exten
 ├─────────────────────────────────────────────────────────────┤
 │ Layer 1: Core Builder (operators, WHERE/GROUP/ORDER BY)      │
 ├─────────────────────────────────────────────────────────────┤
-│ Foundation: squel (SQL primitives) + Zod (schema validation) │
+│ Foundation: SelectBuilder (in-house SQL) + Zod (schema)      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -202,8 +202,9 @@ typed.where('email__contains', 'example.com');  // ✓
 |-----------|-----|---------|
 | define.ts | 148 | Model registry and relation definitions |
 | include.ts | 188 | ModelQueryComposer with eager loading API |
-| types.ts | 199 | Relation type definitions (belongsTo, hasOne, hasMany, hasManyThrough) |
-| loader.ts | 300 | DataLoader-based batch loading |
+| types.ts | 187 | Relation type definitions (belongsTo, hasOne, hasMany, hasManyThrough) |
+| loader.ts | 250 | Key grouping, DataLoader creation, `loadRelation()` |
+| batch-load-config.ts | 166 | Batch query construction per relation type |
 
 **Relation Types Supported:**
 
@@ -258,6 +259,20 @@ With DataLoader (1+1):
 SELECT * FROM users;                                  -- 1 query
 SELECT * FROM posts WHERE user_id IN ($1, $2, ...);  -- 1 query (batched)
 ```
+
+**Two batching paths:**
+
+| Path | When | Mechanism |
+|---|---|---|
+| `loadRelation(records, ...)` without a loader | keys all known upfront (eager load) | direct: dedupe → 1 query → `groupByKey`, no DataLoader involved |
+| `createRelationLoader()` + `.load(key)` | independent call sites (GraphQL resolvers) | DataLoader coalesces per tick + caches per key |
+
+The direct path exists because a throwaway DataLoader adds tick scheduling and a
+promise per key for no benefit when nothing is shared — measured 2.15x slower.
+
+Both paths reject on executor failure. `loadMany` reports per-key failures as
+`Error` **values** instead of rejecting, so `loadRelation()` re-throws them: a dead
+connection must never masquerade as "this parent has no children".
 
 **Batch Loading API:**
 
@@ -372,8 +387,9 @@ Introspects Zod schema to extract column names, handling:
 ├─ core/ ◄────────────────────────────────┐
 │  │                                       │
 │  ├─ query-composer.ts                   │
-│  │  └─ squel + zod + operators.ts       │
-│  │     + errors.ts + zod-utils.ts       │
+│  │  └─ sql-builder.ts + zod             │
+│  │     + operators.ts + errors.ts       │
+│  │     + zod-utils.ts                   │
 │  │                                       │
 │  ├─ operators.ts (34 handlers)          │
 │  ├─ types.ts (Type definitions)         │
@@ -459,7 +475,7 @@ User Code
    │  └─ Add LIMIT/OFFSET metadata
    │
    └─ .build()
-      ├─ Generate SQL via squel
+      ├─ Generate SQL via SelectBuilder
       ├─ Bind values as $1, $2, ...
       └─ Return { sql, values }
 ```
@@ -569,7 +585,8 @@ Add to `relations/types.ts` and implement loader in `relations/loader.ts`.
 
 ### SQL Injection Prevention
 
-All values parameterized via squel:
+All values parameterized via `SelectBuilder` (`?` accumulated during build,
+numbered to `$N` once in `toParam()`):
 
 ```typescript
 // Input: { email: "'; DROP TABLE users; --" }

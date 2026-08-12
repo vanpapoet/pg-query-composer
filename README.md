@@ -3,7 +3,8 @@
 [![npm version](https://img.shields.io/npm/v/pg-query-composer.svg?style=flat-square)](https://www.npmjs.com/package/pg-query-composer)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4%2B-blue?style=flat-square)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-120%2B-brightgreen?style=flat-square)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-270-brightgreen?style=flat-square)](tests/)
+[![Dependencies](https://img.shields.io/badge/Core%20runtime%20deps-0-brightgreen?style=flat-square)](package.json)
 
 Advanced PostgreSQL query builder for TypeScript with dynamic composition, type safety, and N+1 prevention.
 
@@ -18,6 +19,8 @@ Advanced PostgreSQL query builder for TypeScript with dynamic composition, type 
 - Batch loading eliminates N+1 database queries
 - PostgreSQL-native features (JSONB, Full-Text Search, Recursive CTEs)
 - Reusable scopes and fragments for DRY queries
+- Zero runtime dependencies in the core builder (`zod` is a peer dependency; the
+  optional `/relations` module pulls in `dataloader`)
 
 ## Installation
 
@@ -25,7 +28,7 @@ Advanced PostgreSQL query builder for TypeScript with dynamic composition, type 
 npm install pg-query-composer zod
 ```
 
-**Requirements:** Node.js 18+, TypeScript 5.4+, PostgreSQL 12+
+**Requirements:** Node.js 18+, TypeScript 5.4+, PostgreSQL 12+ (built with TypeScript 7.0)
 
 ## Quick Start
 
@@ -208,11 +211,9 @@ See full API docs in [`/docs`](docs/):
 
 ## Documentation
 
-- **[Project Overview](docs/project-overview-pdr.md)** - Goals, features, requirements
-- **[Codebase Summary](docs/codebase-summary.md)** - Module breakdown, metrics
-- **[Code Standards](docs/code-standards.md)** - Conventions, patterns
 - **[System Architecture](docs/system-architecture.md)** - Design, data flow
-- **[Project Roadmap](docs/project-roadmap.md)** - Versioned milestones
+- **[Code Standards](docs/code-standards.md)** - Conventions, patterns
+- **[Changelog](CHANGELOG.md)** - Release history and engineering decisions
 
 ### Feature Guides
 
@@ -237,7 +238,8 @@ npm test              # Run all tests
 npm run test:watch    # Watch mode
 ```
 
-**Coverage:** 120+ test cases, 85%+ line coverage, all public APIs tested.
+**Coverage:** 270 test cases across 21 files — including 44 dedicated SQL injection
+prevention tests — all public APIs tested. Verified against TypeScript 7.0.
 
 ## Contributing
 
@@ -254,17 +256,7 @@ MIT - See LICENSE file
 
 ## Changelog
 
-### v1.0.1 (2026-02-11)
-
-- Core QueryComposer with 34 operators
-- Type-safe TypedQueryComposer wrapper
-- 13 reusable filter fragments
-- Full relation support (belongsTo, hasOne, hasMany, hasManyThrough)
-- DataLoader-based batch loading
-- 11 JSONB operators
-- Full-Text Search (5 methods)
-- Recursive CTE builder
-- 120+ test cases
+See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 

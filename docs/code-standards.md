@@ -53,17 +53,17 @@ src/
 
 ### Import Organization
 Order imports as:
-1. External dependencies (squel, zod, etc.)
+1. External dependencies (zod, dataloader, etc.)
 2. Internal modules (use relative paths)
 3. Type imports (use `import type`)
 4. Side-effect imports (minimal)
 
 ```typescript
-import squel from 'squel';
 import * as z from 'zod';
 
 import { extractZodColumns } from '../utils/zod-utils';
 import { OPERATORS, VALID_OPERATORS } from './operators';
+import { SelectBuilder } from './sql-builder';
 
 import type { QueryOperator, Condition } from './types';
 ```
@@ -125,6 +125,34 @@ export class QueryComposer { /* ... */ }
 private conditions: Condition[] = [];
 private readonly whitelist: readonly string[];
 ```
+
+### Linting
+
+Linter: **oxlint** (`.oxlintrc.json`), not ESLint. Reason: `typescript-eslint` hard-blocks
+TypeScript 7 (upstream issue #10940), and this repo builds on `typescript@^7`. oxlint parses TS
+via oxc, so it needs no TypeScript API.
+
+```bash
+npm run lint        # src + tests + benchmarks, must exit 0 before commit
+npm run lint:fix    # apply auto-fixable rules
+```
+
+Enabled categories: `correctness` (error), `suspicious` + `perf` (warn), plugins `typescript`,
+`unicorn`, `oxc`, `promise`, `import`.
+
+Rules deliberately disabled, with rationale:
+
+| Rule | Why off |
+|---|---|
+| `typescript/no-explicit-any` | `any` is intentional in generic value/query plumbing |
+| `typescript/no-non-null-assertion` | used where the whitelist already guarantees presence |
+| `no-underscore-dangle` | `_groups`, `_limit`, … are the builder's internal-field convention |
+| `unicorn/no-new-array` | `new Array(n)` preallocation in hot loops is benchmark-verified |
+
+Tests/benchmarks/scripts get a looser override (`no-console`, `no-unused-vars`,
+`no-await-in-loop`, `unicorn/no-array-sort` off) — sequential awaits and throwaway fixtures are
+the point there. Use `// eslint-disable-next-line <rule>` with a comment explaining why for
+one-off exceptions in `src/` (oxlint honors ESLint-style directives).
 
 ## Design Patterns & Conventions
 
@@ -320,8 +348,8 @@ export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
 ## Dependency Management
 
 ### Runtime Dependencies
-- squel: SQL builder (minimal API surface)
-- zod: Schema validation (only for schema introspection)
+- *(none)* — SQL emission lives in `src/core/sql-builder.ts`; keep the package zero-dep
+- zod: peer only (schema introspection), never bundled
 
 ### Peer Dependencies
 - zod: Must be installed by consumer (schema definition)
@@ -344,9 +372,12 @@ export const OPERATORS: Record<QueryOperator, OperatorHandler> = {
 - One SQL generation pass (no rebuilding)
 
 ### Batch Loading
-- Always use DataLoader for N+1 prevention
-- Batch size configurable, default reasonable
-- Cache results between requests
+- DataLoader is for the **cross-call** case only: independent `.load(key)` call sites
+  that must coalesce into one query within a tick, plus the per-request cache
+- When every key is already known upfront (`loadRelation()` with no supplied loader),
+  skip DataLoader: dedupe → one query → `groupByKey` is the whole job, and avoiding
+  its tick scheduling + per-key promises measured **2.15x faster** (1000 records/call)
+- Cache results between requests by passing a shared loader into `loadRelation()`
 
 ### Type Checking
 - TypeScript compilation should complete in < 5s
