@@ -104,8 +104,8 @@ export { QueryComposer, createQueryComposer } from './core/query-composer';
  *
  * @example
  * const composer = new QueryComposer(schema, 'users');
- * composer.where('email__contains', 'example.com');
- * const { sql, values } = composer.build();
+ * composer.where({ email__contains: 'example.com' });
+ * const { text, values } = composer.toParam();
  */
 export class QueryComposer { /* ... */ }
 ```
@@ -280,7 +280,7 @@ it('should validate columns', () => {
   const composer = new QueryComposer(schema, 'users');
 
   // Act & Assert
-  expect(() => composer.where('invalid__exact', 'value'))
+  expect(() => composer.where({ invalid__exact: 'value' }))
     .toThrow(InvalidColumnError);
 });
 ```
@@ -307,11 +307,11 @@ Verify parameterized queries for correctness:
 ```typescript
 it('should build parameterized query', () => {
   const composer = new QueryComposer(schema, 'users');
-  composer.where('email__contains', 'example.com');
-  const { sql, values } = composer.build();
+  composer.where({ email__contains: 'example.com' });
+  const { text, values } = composer.toParam();
 
-  expect(sql).toContain('WHERE');
-  expect(sql).toContain('$1'); // Parameterized placeholder
+  expect(text).toContain('WHERE');
+  expect(text).toContain('$1'); // Parameterized placeholder
   expect(values).toEqual(['%example.com%']);
 });
 ```

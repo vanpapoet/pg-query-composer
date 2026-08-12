@@ -258,21 +258,34 @@ const User = defineModel({
 
 const query = createModelQuery(User);
 
-// Include company with filter
-query.include('company', {
-  where: { status__exact: 'active' },
-});
+// Include takes a CALLBACK that receives the relation's own composer
+query.include('company', (qc) => qc.where({ status__exact: 'active' }));
 
-const { text, values } = query.toParam();
-console.log(text);
-// → SELECT * FROM users INNER JOIN companies ON users.company_id = companies.id WHERE companies.status = $1
-console.log(values);
-// → ['active']
+// The parent query is unchanged — includes never add a JOIN to it
+console.log(query.toParam().text);
+// → SELECT * FROM users
+
+// The relation query is returned separately
+console.log(query.getIncludeQueries());
+// → [{ relation: 'company', type: 'belongsTo',
+//      foreignKey: 'company_id', primaryKey: 'id',
+//      query: { text: 'SELECT * FROM companies WHERE status = $1',
+//               values: ['active'] } }]
 ```
 
-### Nested Includes
+Pass `targetSchema` on the relation to give that relation query its own column
+whitelist; without one it falls back to a non-strict composer, because there is
+no schema to validate the filters against.
 
-Load multiple levels of relations:
+The parent-key predicate is not part of `getIncludeQueries()` output — combine it
+with the returned `foreignKey` / `primaryKey`, or use `loadRelation()` (below),
+which builds the key restriction itself but does not apply the callback.
+
+### Multi-level Loading
+
+There is no nested-include syntax — depth is expressed by calling
+`loadRelation()` once per level, which is also what keeps the query count at one
+per level instead of one per row:
 
 ```typescript
 import { defineModel, createModelQuery } from 'pg-query-composer/relations';
@@ -328,18 +341,20 @@ const User = defineModel({
   },
 });
 
-const query = createModelQuery(User);
+const execute = async ({ text, values }) => (await pool.query(text, values)).rows;
 
-// Include nested relations
-query.include('company', {
-  include: {
-    country: {},
-  },
-});
+// Level 0: the users
+const users = await execute(createModelQuery(User).toParam());
+// → SELECT * FROM users
 
-const { text } = query.toParam();
-console.log(text);
-// → SELECT * FROM users INNER JOIN companies ON users.company_id = companies.id INNER JOIN countries ON companies.country_id = countries.id
+// Level 1: their companies (one query for all users)
+const withCompany = await loadRelation(users, User, 'company', execute);
+// → SELECT * FROM companies WHERE id = ANY($1)
+
+// Level 2: the companies' countries (one query for all companies)
+const companies = withCompany.map((u) => u.company).filter(Boolean);
+await loadRelation(companies, Company, 'country', execute);
+// → SELECT * FROM countries WHERE id = ANY($1)
 ```
 
 ## Batch Loading
@@ -457,14 +472,19 @@ const Post = defineModel({
   },
 });
 
-// Existing post data
-const post = { id: 1, author_id: 42, title: 'Query Guide' };
+// Existing post rows — loadRelation takes an ARRAY, the model, the relation
+// name and an executor (a function that runs { text, values } and returns rows)
+const posts = [{ id: 1, author_id: 42, title: 'Query Guide' }];
 
-// Load relation (simplified)
-const enriched = loadRelation(post, 'author', [], {});
-console.log('Relation loaded');
-// → Relation loaded
+const execute = async ({ text, values }) => (await pool.query(text, values)).rows;
+
+const enriched = await loadRelation(posts, Post, 'author', execute);
+// SELECT * FROM users WHERE id = ANY($1)   |   [[42]]
+// → [{ id: 1, author_id: 42, title: 'Query Guide', author: { id: 42, ... } }]
 ```
+
+`belongsTo` / `hasOne` set the relation to a single record (or `null`);
+`hasMany` / `hasManyThrough` set it to an array.
 
 ## Real-world Pattern: Blog App with Eager Loading
 
@@ -540,25 +560,30 @@ const Comment = defineModel({
   },
 });
 
-// Query: Get published posts with active authors and their comments
-const query = createModelQuery(Post);
-query
+// Query: published posts, page 1 — then their authors and comments
+const query = createModelQuery(Post)
   .where({ status__exact: 'published' })
-  .include('author', {
-    where: { status__exact: 'active' },
-  })
-  .include('comments', {
-    include: {
-      author: {
-        where: { status__exact: 'active' },
-      },
-    },
-  })
+  .orderBy('-created_at')
   .paginate({ page: 1, limit: 10 });
 
 const { text, values } = query.toParam();
 console.log(text);
-// → Multi-table join with filters and pagination
+// → SELECT * FROM posts WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
 console.log(values);
-// → ['published', 'active', 'active']
+// → ['published', 10, 0]
+
+const execute = async (q) => (await pool.query(q.text, q.values)).rows;
+
+const posts = await execute({ text, values });
+
+// 2 more queries total — not 2 per post
+const withAuthors = await loadRelation(posts, Post, 'author', execute);
+const withComments = await loadRelation(withAuthors, Post, 'comments', execute);
+
+// Third level: each comment's author (1 query for every comment on the page)
+const comments = withComments.flatMap((p) => p.comments);
+await loadRelation(comments, Comment, 'author', execute);
 ```
+
+Four queries for a page of posts + authors + comments + comment authors,
+regardless of how many rows come back.
