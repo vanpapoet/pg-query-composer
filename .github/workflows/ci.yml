@@ -10,11 +10,26 @@ permissions:
   contents: read
 
 jobs:
+  # Lint runs once, on a single Node version: oxlint declares
+  # `engines: ^20.19.0 || >=22.12.0`, and it is dev tooling — running it across
+  # the whole matrix buys duplicate output and a false failure on the lowest
+  # supported Node.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [20, 22]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,7 +37,6 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
-      - run: npm run lint
       - run: npm run build
       # `npm test` runs every tests/ directory — a hand-listed set silently
       # skips newly added suites.

@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-08-12
 
-> Shipped as a minor despite the two breaking items below: every subpath import
+> Shipped as a minor despite the breaking items below: every subpath import
 > was broken in 1.0.2, so no consumer can have depended on `toParam().values`
 > shape from `/relations` or `groupByKey()`. Check the Breaking section before
 > upgrading if you imported from the root entry.
 
 ### Breaking
 
+- **Node 18 is no longer supported** — `engines` is now `>=20.0.0`. Node 18 left
+  maintenance in April 2025, and the linter (`oxlint`, `engines:
+  ^20.19.0 || >=22.12.0`) cannot run on it, so CI could not verify the claim.
+  Tested on Node 20 and 22.
 - `in` / `notin` now emit `col = ANY($1)` / `col <> ALL($1)` instead of
   `col IN ($1, $2, ...)`. The whole list binds as a **single array parameter**,
   so `toParam().values` is `[[a, b, c]]` rather than `[a, b, c]`. One SQL text now
