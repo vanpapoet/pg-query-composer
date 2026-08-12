@@ -5,11 +5,31 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./composition": "./dist/composition/index.js",
-    "./subquery": "./dist/subquery/index.js",
-    "./relations": "./dist/relations/index.js",
-    "./pg": "./dist/pg/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./composition": {
+      "types": "./dist/composition/index.d.ts",
+      "default": "./dist/composition/index.js"
+    },
+    "./subquery": {
+      "types": "./dist/subquery/index.d.ts",
+      "default": "./dist/subquery/index.js"
+    },
+    "./relations": {
+      "types": "./dist/relations/index.d.ts",
+      "default": "./dist/relations/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/types/index.js"
+    },
+    "./pg": {
+      "types": "./dist/pg/index.d.ts",
+      "default": "./dist/pg/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsc",
