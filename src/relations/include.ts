@@ -30,7 +30,7 @@ export class ModelQueryComposer extends QueryComposer {
   private includes: TrackedInclude[] = [];
 
   constructor(model: ModelDefinition) {
-    super(model.schema, model.table, { strict: false });
+    super(model.schema, model.table);
     this.model = model;
   }
 
@@ -100,11 +100,15 @@ export class ModelQueryComposer extends QueryComposer {
     primaryKey: string;
   }> {
     return this.includes.map((inc) => {
-      const baseQuery = new QueryComposer(
-        EMPTY_SCHEMA,
-        inc.config.target,
-        { strict: false }
-      );
+      // Whitelist against the relation's target schema when the model declares
+      // one. Falls back to a non-strict composer only when no schema is
+      // available, since there is then nothing to validate the filters against.
+      const targetSchema = inc.config.targetSchema;
+      const baseQuery = targetSchema
+        ? new QueryComposer(targetSchema, inc.config.target, {
+            extraColumns: [inc.config.foreignKey, inc.config.primaryKey],
+          })
+        : new QueryComposer(EMPTY_SCHEMA, inc.config.target, { strict: false });
 
       // Apply custom query modifications if provided
       const finalQuery = inc.query ? inc.query(baseQuery) : baseQuery;

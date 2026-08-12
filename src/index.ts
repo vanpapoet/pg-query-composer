@@ -7,7 +7,7 @@
  * @packageDocumentation
  */
 
-export const VERSION = '1.0.1';
+export const VERSION = '1.0.2';
 
 // Core exports
 export { QueryComposer, createQueryComposer } from './core/query-composer';
@@ -93,7 +93,6 @@ export type {
   ModelDefinition,
   IncludeOptions,
   LoadedRelation,
-  BatchLoadConfig,
 } from './relations/types';
 export {
   createRelationLoader,
@@ -103,7 +102,7 @@ export {
   createAllRelationLoaders,
   loadRelation,
 } from './relations/loader';
-export type { QueryExecutor } from './relations/loader';
+export type { QueryExecutor, RelationKey, BatchLoadConfig } from './relations/loader';
 
 // Type-safe exports
 export { TypedQueryComposer, createTypedComposer, typedFilter } from './types/infer';
@@ -154,4 +153,4 @@ export {
 
 // Utility exports
 export { extractZodColumns } from './utils/zod-utils';
-export { validateIdentifier } from './core/identifier-validation';
+export { validateIdentifier, validateColumnName } from './core/identifier-validation';

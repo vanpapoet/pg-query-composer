@@ -181,18 +181,7 @@ export interface LoadedRelation<T = unknown> {
   isSingle: boolean;
 }
 
-/**
- * Batch load configuration for DataLoader
- */
-export interface BatchLoadConfig {
-  /** Column to batch on */
-  batchColumn: string;
-  /** Values to batch load */
-  batchValues: unknown[];
-  /** Target table */
-  table: string;
-  /** Target schema */
-  schema: z.ZodTypeAny;
-  /** Additional query modifications */
-  query?: (qc: QueryComposer) => QueryComposer;
-}
+// NOTE: `BatchLoadConfig` used to be declared here too, with a shape nothing in
+// the library produced or consumed. It collided with the real one returned by
+// `batchLoad*()`, so `BatchLoadConfig` now has a single definition in
+// batch-load-config.ts.

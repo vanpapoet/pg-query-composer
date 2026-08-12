@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { QueryComposer } from '../core/query-composer';
-import type { QueryBuilderOptions, QueryOperator } from '../core/types';
+import type { QueryBuilderOptions } from '../core/types';
 
 /**
  * Extract column names from a Zod object schema
