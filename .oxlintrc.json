@@ -1,0 +1,49 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "promise", "import"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    "coverage/**",
+    "guide/**",
+    ".claude/**"
+  ],
+  "rules": {
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "eqeqeq": ["error", "smart"],
+    "no-var": "error",
+    "prefer-const": "error",
+    "typescript/no-explicit-any": "off",
+    "typescript/no-non-null-assertion": "off",
+    "no-underscore-dangle": "off",
+    "unicorn/no-new-array": "off"
+  },
+  "overrides": [
+    {
+      "files": ["tests/**/*.ts", "benchmarks/**/*.ts", "scripts/**/*.ts"],
+      "rules": {
+        "no-console": "off",
+        "no-unused-vars": "off",
+        "no-await-in-loop": "off",
+        "unicorn/no-array-sort": "off"
+      }
+    }
+  ]
+}
