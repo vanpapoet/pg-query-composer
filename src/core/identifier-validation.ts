@@ -52,3 +52,24 @@ export function validateColumnName(column: string): void {
     );
   }
 }
+
+// Output aliases are single, unqualified identifiers — `col AS schema.alias` is
+// not valid SQL, so dots are rejected here even though COLUMN_NAME_RE allows them.
+const ALIAS_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+/**
+ * Validate that a string is usable as an output alias (`expr AS alias`).
+ *
+ * Stricter than `validateColumnName`: no dots, no expressions. Use wherever an
+ * alias is concatenated into SQL (e.g. `QueryBuilderOptions.aliases`).
+ *
+ * @param alias - The alias to validate
+ * @throws Error if the alias is not a plain unqualified identifier
+ */
+export function validateAliasName(alias: string): void {
+  if (!alias || !ALIAS_NAME_RE.test(alias)) {
+    throw new Error(
+      `Unsafe column alias: "${alias}". Expected a plain unqualified identifier such as "email_addr".`
+    );
+  }
+}

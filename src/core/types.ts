@@ -108,6 +108,29 @@ export interface QueryBuilderOptions {
   strict?: boolean;
   separator?: string;
   extraColumns?: string[];
+  /**
+   * Columns filterable even when the schema does not declare them.
+   *
+   * Defaults to `DEFAULT_FILTER_COLUMNS` (`id`, `created_at`, `updated_at`,
+   * `deleted_at`) — a convention, not a fact about the table. Override it for
+   * a different convention (`inserted_at`, `createdAt`, …), or pass `[]` to
+   * accept only what the schema declares.
+   *
+   * Filter-only: these are never expanded into a projection by `exclude()`,
+   * since nothing guarantees the table has them. Declare them in the schema
+   * (or in `extraColumns`) if they should be selectable.
+   */
+  defaultColumns?: readonly string[];
+  /**
+   * Output column aliases, `alias → source column`.
+   *
+   * `{ email_addr: 'email' }` makes SELECT emit `email AS email_addr`. Renames
+   * the result column only — `where()`, `orderBy()` and `groupBy()` keep taking
+   * the real column name, and the alias is never whitelisted as a filter key.
+   *
+   * With `select()`/`exclude()` the column is renamed in place; without either,
+   * `SELECT *` is kept and the aliased copies are appended.
+   */
   aliases?: Record<string, string>;
 }
 
