@@ -5,6 +5,55 @@ All notable changes to **pg-query-composer** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-08-13
+
+Hotfix: 1.1.0 could not be installed alongside zod v4, and one code path threw
+at runtime on it. Reported from a downstream consumer that needs `z.iso`, a
+zod-v4-only API, so staying on v3 was not an option for them.
+
+zod v3 support is unchanged — the fixes are version-agnostic, not a migration.
+
+### Fixed
+
+- **`peerDependencies` now accepts zod v4** (`^3.23.0 || ^4.0.0`). Installing
+  1.1.0 into any zod v4 project failed with `ERESOLVE`.
+- **`extractZodColumns()` threw `TypeError` on zod v4.** It branched on
+  `schema instanceof z.ZodEffects`, and v4 removed `ZodEffects`, so the
+  right-hand side was `undefined`. This killed the `ZodOptional` / `ZodNullable`
+  branches below it and the duck-typing fallback that would otherwise have
+  covered them, so `.transform()`, `.optional()`, `.nullable()` and `.default()`
+  schemas all crashed — as did plain `z.string()` / `z.array()`, which are only
+  supposed to return `[]`. Wrapper types are now unwrapped structurally via
+  `_def` (`schema` / `in` / `innerType`): zod class identity is not stable
+  across majors, but the `_def` shape is. Plain `z.object()` was never affected
+  — the duck-typed `.shape` check returned first — so the blast radius was
+  top-level wrapped and non-object schemas.
+- **`extractZodColumns(null)` threw `Invalid value used as weak map key`** on
+  both majors: the guard ran after the `WeakMap.set()`, not before it.
+- **`InferResult<T, Selected>` failed to compile against zod v4** with
+  `TS2344: Type 'Selected[number]' does not satisfy the constraint 'keyof output<T>'`.
+  While `T` is an unresolved generic, v4 collapses `keyof output<T>` to `never`.
+  Intersecting with `keyof InferZodType<T>` fixes it. This blocked the library's
+  own build on v4 and every consumer compiling the shipped `.d.ts` with
+  `skipLibCheck: false` (TypeScript's default).
+
+### Changed
+
+- CI now runs the test matrix against **both zod majors**. A single-version CI
+  could not have caught any of the above. Note the matrix alone is not enough
+  either: the unpatched 1.1.0 source passes all 286 pre-existing tests on zod
+  4.4.3, because nothing exercised a wrapped or non-object top-level schema.
+  `tests/utils/zod-schema-unwrapping.test.ts` is what makes the v4 leg
+  meaningful; the matrix without it goes green on broken code.
+
+### Notes
+
+- `z.ZodTypeAny` is **not** removed in zod v4 — it survives as a type alias for
+  `ZodType` in zod's `v4/classic/compat` module, so the 7 declaration files that
+  reference it compile clean on 4.4.3. Only the runtime *value* is `undefined`,
+  and it is never used as one. It was reported as a third break; it is not one,
+  and is left in place rather than churned.
+
 ## [1.1.0] - 2026-08-12
 
 > Shipped as a minor despite the breaking items below: every subpath import

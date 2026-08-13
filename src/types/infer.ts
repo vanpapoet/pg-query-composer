@@ -196,12 +196,18 @@ export function createTypedComposer<T extends z.ZodTypeAny>(
  *
  * If no select is specified, returns full type.
  * Otherwise returns pick of selected fields.
+ *
+ * `& keyof InferZodType<T>` is load-bearing: while `T` is still an unresolved
+ * generic, zod v4 collapses `keyof output<T>` to `never`, so a bare
+ * `Selected[number]` fails `Pick`'s constraint (TS2344) at the declaration site
+ * — breaking the library's own build on v4 and every consumer compiling the
+ * shipped `.d.ts` with `skipLibCheck: false`.
  */
 export type InferResult<
   T extends z.ZodTypeAny,
   Selected extends InferColumns<T>[] | undefined = undefined
 > = Selected extends InferColumns<T>[]
-  ? Pick<InferZodType<T>, Selected[number]>
+  ? Pick<InferZodType<T>, Selected[number] & keyof InferZodType<T>>
   : InferZodType<T>;
 
 /**

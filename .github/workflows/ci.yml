@@ -25,11 +25,16 @@ jobs:
       - run: npm ci
       - run: npm run lint
 
+  # The zod axis is not cosmetic: 1.1.0 shipped a `TypeError` on zod v4 that a
+  # single-version CI could not see. `npm run build` matters as much as the
+  # tests here — the v4 type breaks surface through `tsc`, not vitest.
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         node-version: [20, 22]
+        zod: [3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,6 +42,11 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
+      # zod is a peerDependency; the devDependency pins v3 so a bare `npm ci`
+      # only ever exercises one major. Override it on the v4 leg.
+      - name: Install zod ${{ matrix.zod }}
+        run: npm i -D --no-save zod@${{ matrix.zod }}
+      - run: node -p "'zod ' + require('zod/package.json').version"
       - run: npm run build
       # `npm test` runs every tests/ directory — a hand-listed set silently
       # skips newly added suites.

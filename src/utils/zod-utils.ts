@@ -26,6 +26,10 @@ function isZodObjectLike(schema: unknown): schema is { shape: Record<string, unk
  * Results are cached per schema reference via WeakMap.
  */
 export function extractZodColumns(schema: z.ZodTypeAny): string[] {
+  // Guard before touching the WeakMap: a non-object key makes `.set()` throw
+  // `TypeError: Invalid value used as weak map key`.
+  if (schema == null || typeof schema !== 'object') return [];
+
   const cached = zodColumnsCache.get(schema);
   if (cached) return cached;
 
@@ -36,24 +40,24 @@ export function extractZodColumns(schema: z.ZodTypeAny): string[] {
 
 /**
  * Walk the schema to find the underlying ZodObject shape.
- * Handles ZodObject, ZodEffects, ZodOptional, ZodNullable + duck-typing fallbacks.
+ *
+ * Unwraps structurally rather than via `instanceof`: zod class identity is not
+ * stable across majors (`z.ZodEffects` is `undefined` on v4, so
+ * `schema instanceof z.ZodEffects` throws `TypeError` for anything that is not
+ * object-like), but the `_def` shape is. Covers ZodObject, `.transform()`
+ * (v3 `ZodEffects._def.schema` / v4 `ZodPipe._def.in`), `.optional()`,
+ * `.nullable()` and `.default()` (`_def.innerType`, both majors).
  */
 function extractColumnsUncached(schema: z.ZodTypeAny): string[] {
-  // Fast path: instanceof ZodObject (same zod version)
-  if (schema instanceof z.ZodObject) return Object.keys(schema.shape);
-
-  // Duck-typing fallback for cross-version compatibility
+  // ZodObject — `.shape` exists on both v3 and v4
   if (isZodObjectLike(schema)) return Object.keys(schema.shape);
 
-  // Wrapper types: unwrap and recurse (ZodEffects, ZodOptional, ZodNullable)
-  if (schema instanceof z.ZodEffects) return extractZodColumns(schema._def.schema);
-  if (schema instanceof z.ZodOptional) return extractZodColumns(schema._def.innerType);
-  if (schema instanceof z.ZodNullable) return extractZodColumns(schema._def.innerType);
-
-  // Duck-typing fallback for wrapper types
-  const def = (schema as any)?._def;
-  if (def?.schema) return extractZodColumns(def.schema);
-  if (def?.innerType) return extractZodColumns(def.innerType);
+  const def = (schema as any)._def;
+  if (def) {
+    if (def.schema) return extractZodColumns(def.schema); // v3 ZodEffects
+    if (def.in) return extractZodColumns(def.in); // v4 ZodPipe (.transform)
+    if (def.innerType) return extractZodColumns(def.innerType); // optional/nullable/default
+  }
 
   return [];
 }
