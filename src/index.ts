@@ -13,13 +13,13 @@
  * @packageDocumentation
  */
 
-export const VERSION = '1.1.1';
+export const VERSION = '1.2.0';
 
 // ===========================================================================
 // CORE
 // ===========================================================================
 
-export { QueryComposer, createQueryComposer } from './core/query-composer';
+export { QueryComposer, createQueryComposer, DEFAULT_FILTER_COLUMNS } from './core/query-composer';
 export type {
   QueryOperator,
   ComparisonOperator,
@@ -69,4 +69,4 @@ export * from './pg';
 // ===========================================================================
 
 export { extractZodColumns } from './utils/zod-utils';
-export { validateIdentifier, validateColumnName } from './core/identifier-validation';
+export { validateIdentifier, validateColumnName, validateAliasName } from './core/identifier-validation';

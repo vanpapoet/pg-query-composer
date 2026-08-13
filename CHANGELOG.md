@@ -5,6 +5,78 @@ All notable changes to **pg-query-composer** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-08-13
+
+> Minor, not a patch: `exclude()` changes what it selects, and both `exclude()`
+> and `extraColumns` now throw where they used to pass silently. See Fixed.
+
+### Added
+
+- **`QueryBuilderOptions.aliases` now does something.** The option was declared,
+  defaulted, stored on the instance and documented in `docs/guide-core-builder.md`
+  since the initial commit, but `this.options.aliases` was never read — no code
+  path outside the constructor touched it, and no test covered it. Passing
+  `{ email_addr: 'email' }` changed nothing except costing the `DEFAULT_OPTIONS`
+  fast path, and `where({ email_addr })` threw `InvalidColumnError` while SELECT
+  emitted no `AS`.
+
+  It is now an **output** alias, `alias → source column`: SELECT emits
+  `email AS email_addr`. Filters, sorting and grouping still take the real column
+  name — the alias is never whitelisted as a filter key, so this adds no new way
+  to reach a column. With `select()`/`exclude()` the column is renamed in place;
+  with neither, `*` is kept and the aliased copies are appended
+  (`SELECT *, email AS email_addr`), leaving the source column in the result set.
+
+  Both halves land in SQL unparameterized, so both are validated once at
+  construction: the alias through the new `validateAliasName()` (plain
+  unqualified identifier — stricter than `validateColumnName`, which permits
+  `table.col`), the source through `validateColumnName()`, plus a whitelist check
+  when `strict`. Alias handling lives in `src/core/column-aliases.ts`; the map is
+  `null` when no alias is declared, so the common path is unchanged.
+
+- **`QueryBuilderOptions.defaultColumns`** makes the always-filterable column
+  set configurable. `id` / `created_at` / `updated_at` / `deleted_at` were
+  hard-coded, which silently assumed one naming convention: a schema on
+  `inserted_at` (Ecto), `createdAt` (camelCase) or with no soft-delete column
+  could neither filter on its own convention without listing it in
+  `extraColumns`, nor stop accepting four columns it does not have. The list now
+  defaults to the exported `DEFAULT_FILTER_COLUMNS` and can be replaced
+  (`[...DEFAULT_FILTER_COLUMNS, 'tenant_id']` to extend, `[]` to accept only
+  schema columns). The per-schema whitelist cache is keyed to the untouched
+  default, so a customized composer neither reads nor writes it.
+
+### Fixed
+
+- **`extraColumns` was never validated.** Entries land in SQL through the
+  operator handlers — `where({ 'x; DROP TABLE u': 1 })` passes the whitelist
+  once the same string is in `extraColumns` — but nothing checked them, unlike
+  every other raw identifier context in the library. Both `extraColumns` and
+  `defaultColumns` now go through `validateColumnName()` at construction.
+  Qualified names for joined tables (`orders.total`) still pass.
+- **`exclude()` projected columns that may not exist.** It expanded `*` from the
+  full filter whitelist, which includes the conventional `id` / `created_at` /
+  `updated_at` / `deleted_at` set that is whitelisted whether or not the schema
+  declares it. `exclude(['password'])` on a three-column schema emitted
+  `SELECT id, email, id, created_at, updated_at, deleted_at` — `id` twice
+  (schema + defaults, never deduplicated) and three columns taken on faith, so
+  any table without them failed at PostgreSQL. The documented output for that
+  exact example was `SELECT id, email FROM users`, which is what it now emits.
+
+  Projections are now built from a separate `projectable` list — schema columns
+  plus `extraColumns`, deduplicated — while the filter whitelist keeps the
+  conventional columns. The whitelist itself is deduplicated too, so
+  `InvalidColumnError` stops listing `id` twice in its hint.
+
+  `exclude()` had no test coverage of any kind before this.
+- **`exclude()` silently ignored unknown columns.** `exclude(['pasword'])` kept
+  no exclusion at all and fell through to `SELECT *`, returning the column the
+  caller meant to hide. It now validates like `select()` / `orderBy()`: throws
+  `InvalidColumnError` when `strict` (the default), skips when not. Likewise,
+  excluding every projectable column throws instead of falling back to
+  `SELECT *` and shipping the excluded columns.
+- Corrected `select()` / `exclude()` signatures in `docs/codebase-summary.md` —
+  both take an array, not rest parameters.
+
 ## [1.1.1] - 2026-08-13
 
 Hotfix: 1.1.0 could not be installed alongside zod v4, and one code path threw

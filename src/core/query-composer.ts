@@ -5,6 +5,7 @@ import { InvalidColumnError, InvalidOperatorError } from './errors';
 import { validateIdentifier, validateColumnName } from './identifier-validation';
 import { isRawFilter } from './raw-filter';
 import { SelectBuilder, toPlaceholders } from './sql-builder';
+import { buildAliasMap, aliasProjection, aliasStarProjection, type AliasMap } from './column-aliases';
 import type {
   QueryOperator,
   QueryBuilderOptions,
@@ -33,25 +34,64 @@ const NEGATED_OPERATORS: Partial<Record<QueryOperator, QueryOperator>> = {
   notbetween: 'between',
 };
 
-// Default columns always included in whitelist
-const DEFAULT_COLUMNS = ['id', 'created_at', 'updated_at', 'deleted_at'] as const;
+/**
+ * Columns accepted in filters even when the schema omits them.
+ *
+ * These are a naming convention, not a fact about the table — a schema using
+ * `inserted_at`, `createdAt` or no soft-delete column at all should override
+ * them via `QueryBuilderOptions.defaultColumns` (pass `[]` to accept only what
+ * the schema declares). Filter-only either way: their presence is an
+ * assumption, so they are never expanded into a projection.
+ */
+export const DEFAULT_FILTER_COLUMNS: readonly string[] = Object.freeze([
+  'id',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+]);
 
-// Cache whitelist arrays and sets per schema (when no extraColumns)
-const whitelistCache = new WeakMap<object, { list: readonly string[]; set: ReadonlySet<string> }>();
+interface Whitelist {
+  /** Everything filterable, deduplicated (drives InvalidColumnError's hint). */
+  list: readonly string[];
+  set: ReadonlySet<string>;
+  /**
+   * Columns known to exist on the table — schema + extraColumns, minus the
+   * assumed default columns. The only list safe to expand into a SELECT, which
+   * `exclude()` has to do to turn `*` into an explicit projection.
+   */
+  projectable: readonly string[];
+}
 
-function buildWhitelist(schema: z.ZodTypeAny, extraColumns: string[]): { list: readonly string[]; set: ReadonlySet<string> } {
-  // Use cache only when no extraColumns (the common case)
-  if (extraColumns.length === 0) {
+// Cache whitelist arrays and sets per schema (only for the fully default case)
+const whitelistCache = new WeakMap<object, Whitelist>();
+
+function buildWhitelist(
+  schema: z.ZodTypeAny,
+  extraColumns: string[],
+  defaultColumns: readonly string[]
+): Whitelist {
+  // Cache only when nothing is customized — both lists feed the cached result
+  const cacheable = extraColumns.length === 0 && defaultColumns === DEFAULT_FILTER_COLUMNS;
+  if (cacheable) {
     const cached = whitelistCache.get(schema);
     if (cached) return cached;
   }
 
-  const schemaColumns = extractZodColumns(schema);
-  const list = [...schemaColumns, ...extraColumns, ...DEFAULT_COLUMNS];
-  const set = new Set(list);
-  const result = { list, set };
+  // Caller-supplied column names reach SQL through the operator handlers, so
+  // they get the same guard as any other raw identifier context
+  for (const column of extraColumns) validateColumnName(column);
+  if (defaultColumns !== DEFAULT_FILTER_COLUMNS) {
+    for (const column of defaultColumns) validateColumnName(column);
+  }
 
-  if (extraColumns.length === 0) {
+  const schemaColumns = extractZodColumns(schema);
+  // Dedupe both lists: a schema declaring `id` would otherwise collide with
+  // the default columns and emit the column twice in an expanded projection
+  const projectable = [...new Set([...schemaColumns, ...extraColumns])];
+  const set = new Set([...projectable, ...defaultColumns]);
+  const result: Whitelist = { list: [...set], set, projectable };
+
+  if (cacheable) {
     whitelistCache.set(schema, result);
   }
   return result;
@@ -63,6 +103,7 @@ const DEFAULT_OPTIONS: Required<QueryBuilderOptions> = {
   separator: '__',
   extraColumns: [],
   aliases: {},
+  defaultColumns: DEFAULT_FILTER_COLUMNS,
 };
 
 /**
@@ -82,6 +123,9 @@ export class QueryComposer {
   private options: Required<QueryBuilderOptions>;
   private whitelist: readonly string[];
   private whitelistSet: ReadonlySet<string>;
+  private projectableColumns: readonly string[];
+  // Source column → output aliases; null when none declared (the common path)
+  private aliasByColumn: AliasMap | null;
 
   private conditions: Condition[] = [];
   private orGroups: OrGroup[] = [];
@@ -110,7 +154,8 @@ export class QueryComposer {
 
     // Use pre-built defaults when no options provided (common path)
     if (!options || (options.strict === undefined && options.separator === undefined
-        && !options.extraColumns?.length && !Object.keys(options.aliases ?? {}).length)) {
+        && !options.extraColumns?.length && !Object.keys(options.aliases ?? {}).length
+        && options.defaultColumns === undefined)) {
       this.options = DEFAULT_OPTIONS;
     } else {
       this.options = {
@@ -118,13 +163,24 @@ export class QueryComposer {
         separator: options.separator ?? '__',
         extraColumns: options.extraColumns ?? [],
         aliases: options.aliases ?? {},
+        // Identity matters: buildWhitelist only caches the untouched default
+        defaultColumns: options.defaultColumns ?? DEFAULT_FILTER_COLUMNS,
       };
     }
 
-    // Build whitelist from schema + extra columns (cached for common case)
-    const wl = buildWhitelist(schema, this.options.extraColumns);
+    // Build whitelist from schema + extra + default columns (cached for common case)
+    const wl = buildWhitelist(schema, this.options.extraColumns, this.options.defaultColumns);
     this.whitelist = wl.list;
     this.whitelistSet = wl.set;
+    this.projectableColumns = wl.projectable;
+
+    // Validate aliases once here — toSelect() then only reads the inverted map
+    this.aliasByColumn = buildAliasMap(
+      this.options.aliases,
+      this.whitelist,
+      this.whitelistSet,
+      this.options.strict
+    );
   }
 
   // ===========================================================================
@@ -359,7 +415,10 @@ export class QueryComposer {
    * Exclude specific fields from selection
    */
   exclude(fields: string[]): this {
-    this.excludedFields = new Set(fields.filter((f) => this.whitelistSet.has(f)));
+    // Validate like select()/orderBy(): dropping an unknown column silently
+    // would return it anyway, so a typo'd `exclude(['pasword'])` must not pass
+    // for "hidden". Non-strict keeps the old skip-unknown behaviour.
+    this.excludedFields = new Set(fields.filter((f) => this.validateColumn(f)));
     return this;
   }
 
@@ -619,11 +678,24 @@ export class QueryComposer {
     let query = new SelectBuilder().from(this.table);
 
     // Apply fields — use SELECT * when no explicit select/exclude (shorter SQL, faster PG parse)
+    const aliases = this.aliasByColumn;
     if (this.selectedFields.length > 0) {
-      query = query.fields(this.selectedFields);
+      query = query.fields(aliases ? aliasProjection(this.selectedFields, aliases) : this.selectedFields);
     } else if (this.excludedFields && this.excludedFields.size > 0) {
-      const fields = this.whitelist.filter((f) => !this.excludedFields!.has(f)) as string[];
-      query = query.fields(fields);
+      // Expanding `*` is the only way to drop a column, so it can only use
+      // columns the schema actually declares — never the assumed DEFAULT_COLUMNS
+      const fields = this.projectableColumns.filter((f) => !this.excludedFields!.has(f)) as string[];
+      if (fields.length === 0) {
+        // Silently falling back to `SELECT *` would ship the excluded column
+        throw new Error(
+          `exclude() cannot build a projection for table "${this.table}": no columns left to select. ` +
+          'Declare the table\'s columns in the schema (or via extraColumns), or use select() instead.'
+        );
+      }
+      query = query.fields(aliases ? aliasProjection(fields, aliases) : fields);
+    } else if (aliases) {
+      // No projection to rename in place — keep `*` and append the aliased copies
+      query = query.fields(aliasStarProjection(aliases));
     }
     // else: no fields() call → SelectBuilder uses SELECT *
 

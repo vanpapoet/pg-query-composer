@@ -42,7 +42,8 @@ const qc = createQueryComposer(userSchema, 'users', {
   strict: false, // Allow non-schema columns
   separator: '__', // Field__operator syntax separator
   extraColumns: ['custom_field'], // Additional whitelisted columns
-  aliases: { email_addr: 'email' }, // Column aliases
+  aliases: { email_addr: 'email' }, // Output aliases: SELECT emits `email AS email_addr`
+  defaultColumns: ['id', 'inserted_at'], // Filterable without being in the schema
 });
 
 console.log('Composer with options created');
@@ -239,6 +240,93 @@ const { text } = qc.toParam();
 console.log(text);
 // → SELECT id, email FROM users
 ```
+
+`exclude()` has to expand `*` into an explicit list, so it can only use columns
+the schema declares (plus `extraColumns`). The columns in `defaultColumns` are
+filterable but are **not** projected — nothing guarantees the table has them.
+When `strict` (the default), excluding an unknown column throws
+`InvalidColumnError` rather than silently returning it, and excluding every
+column throws instead of falling back to `SELECT *`.
+
+### Default Filter Columns
+
+`id`, `created_at`, `updated_at` and `deleted_at` are filterable even when the
+schema omits them. That is a naming convention, not a fact about your table, so
+it is configurable — override it for a different convention, or pass `[]` to
+accept only what the schema declares:
+
+```typescript
+import { createQueryComposer, DEFAULT_FILTER_COLUMNS } from 'pg-query-composer';
+import { z } from 'zod';
+
+const schema = z.object({ name: z.string() });
+
+// Ecto-style timestamps
+const qc = createQueryComposer(schema, 'events', { defaultColumns: ['inserted_at'] });
+console.log(qc.where({ inserted_at: '2026-01-01' }).toParam().text);
+// → SELECT * FROM events WHERE inserted_at = $1
+
+// Schema columns only — filtering on `created_at` now throws InvalidColumnError
+createQueryComposer(schema, 'events', { defaultColumns: [] });
+
+// Extend instead of replace
+createQueryComposer(schema, 'events', {
+  defaultColumns: [...DEFAULT_FILTER_COLUMNS, 'tenant_id'],
+});
+```
+
+The list **replaces** the defaults, it does not extend them. Entries in both
+`defaultColumns` and `extraColumns` are validated as plain column references at
+construction, since they reach SQL directly.
+
+### Column Aliases
+
+`aliases` renames columns **in the result set only** — it maps `alias → source
+column` and makes SELECT emit `source AS alias`:
+
+```typescript
+import { createQueryComposer } from 'pg-query-composer';
+import { z } from 'zod';
+
+const userSchema = z.object({
+  id: z.number(),
+  email: z.string(),
+});
+
+const qc = createQueryComposer(userSchema, 'users', {
+  aliases: { email_addr: 'email' },
+});
+
+qc.select(['id', 'email']);
+console.log(qc.toParam().text);
+// → SELECT id, email AS email_addr FROM users
+```
+
+Without `select()` or `exclude()` there is no field list to rename, so `*` is
+kept and the aliased copies are appended — the source column stays in the
+result set alongside its renamed copy:
+
+```typescript
+const qc2 = createQueryComposer(userSchema, 'users', {
+  aliases: { email_addr: 'email' },
+});
+
+console.log(qc2.toParam().text);
+// → SELECT *, email AS email_addr FROM users
+```
+
+Aliases are output-only. `where()`, `orderBy()` and `groupBy()` still take the
+real column name, and the alias is never whitelisted as a filter key:
+
+```typescript
+qc.where({ email: 'a@b.c' }); // ✓ source column
+qc.where({ email_addr: 'a@b.c' }); // ✗ throws InvalidColumnError
+```
+
+Both sides are concatenated into SQL, so both are validated at construction:
+the alias must be a plain unqualified identifier, the source column a bare
+(optionally qualified) column reference, and — when `strict` (the default) — the
+source must be whitelisted.
 
 ## Sorting
 
