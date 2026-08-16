@@ -132,6 +132,22 @@ export interface QueryBuilderOptions {
    * `SELECT *` is kept and the aliased copies are appended.
    */
   aliases?: Record<string, string>;
+  /**
+   * Emit the table name double-quoted, so PostgreSQL keeps its letter case.
+   *
+   * PG folds unquoted identifiers to lower case, so a table created as
+   * `CREATE TABLE "settings_hangXe"` — the form most ORMs emit — cannot be
+   * reached by a bare `settings_hangXe` reference. Set this to `true` and the
+   * FROM clause becomes `FROM "settings_hangXe"`.
+   *
+   * Off by default: quoting unconditionally would break callers whose table is
+   * genuinely lower-cased in PG and who rely on folding to reach it.
+   *
+   * Affects the FROM clause only. For joins, quote the references yourself —
+   * `join('"donHang"', '"settings_hangXe".id = "donHang"."hangXeId"')` — since
+   * the ON condition is an expression the library cannot safely quote for you.
+   */
+  quoteTable?: boolean;
 }
 
 /**
