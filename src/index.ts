@@ -13,7 +13,7 @@
  * @packageDocumentation
  */
 
-export const VERSION = '1.2.0';
+export const VERSION = '1.3.0';
 
 // ===========================================================================
 // CORE
@@ -69,4 +69,4 @@ export * from './pg';
 // ===========================================================================
 
 export { extractZodColumns } from './utils/zod-utils';
-export { validateIdentifier, validateColumnName, validateAliasName } from './core/identifier-validation';
+export { validateIdentifier, validateColumnName, validateAliasName, quoteIdentifier } from './core/identifier-validation';

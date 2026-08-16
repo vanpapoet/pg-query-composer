@@ -5,6 +5,78 @@ All notable changes to **pg-query-composer** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-08-16
+
+> Minor, not a patch: `validateIdentifier` accepts a form it used to reject.
+> Nothing that passed before is rejected now.
+
+### Added
+
+- **`QueryBuilderOptions.quoteTable`** — emit the table name double-quoted so
+  PostgreSQL keeps its letter case.
+
+  PG folds unquoted identifiers to lower case before resolving them, so a table
+  created as `CREATE TABLE "settings_hangXe"` (what TypeORM, Prisma, Drizzle and
+  Sequelize all emit, since they quote every identifier) could not be reached:
+  the composer passed the name through verbatim, PG folded it, and the query
+  failed with `relation "settings_hangxe" does not exist`. The obvious
+  workaround — passing `'"settings_hangXe"'` — was rejected by
+  `validateIdentifier`, which does not admit `"`. There was no way to query such
+  a table at all.
+
+  ```ts
+  new QueryComposer(schema, 'settings_hangXe', { quoteTable: true })
+  // → SELECT * FROM "settings_hangXe"
+  ```
+
+  Each dot-separated part is quoted individually, so `public.settings_hangXe`
+  becomes `"public"."settings_hangXe"` rather than one table whose name contains
+  a dot.
+
+  Off by default. Auto-quoting whenever the name contains an upper-case letter
+  was rejected: callers whose table genuinely *is* lower-cased in PG rely on
+  folding to reach it today, and quoting would break them at runtime. The
+  library cannot tell the two cases apart without querying `pg_class`, so the
+  contract is explicit — an opt-in flag means "I know my table is quoted".
+
+  No new injection surface: the option takes a plain identifier, not a
+  pre-quoted string. The name is validated with `validateColumnName` (strict
+  `col` / `schema.col`, no spaces, parens or quotes) and the library adds the
+  quotes itself, so a caller-supplied `"` is rejected rather than nested.
+
+  Affects the FROM clause only. Joins are covered by the `validateIdentifier`
+  change below.
+
+- **`validateIdentifier()` now accepts double-quoted identifiers**, so joins can
+  reach case-sensitive tables: `join('"donHang"', '"settings_hangXe".id =
+  "donHang"."hangXeId"')`. An ON condition is an expression, not an identifier,
+  so the library cannot quote it on the caller's behalf — but it previously
+  rejected `"` outright, which made such joins impossible to express at all.
+
+  Quotes are checked by substitution, not permitted as a character: every
+  well-formed `"ident"` is replaced with a bare identifier and the remainder
+  must still satisfy the unquoted rule. A quote surviving that pass is
+  unbalanced or wraps something other than a plain identifier, and the whole
+  string is rejected — `"users"; DROP TABLE users --`, `"users; DROP TABLE
+  users"`, `"a--b"`, `""` and a stray `users"` all still throw. Every character
+  banned outside quotes stays banned inside them, so quoting can only narrow
+  what passes, never widen it.
+
+  Unchanged: `validateIdentifier` remains an expression guard, not a column
+  guard. It has always permitted spaces, parens and `=` (so `users OR 1=1`
+  passes), and quoting neither helps nor worsens that. `validateColumnName` and
+  `validateAliasName` are untouched and still reject `"`.
+
+- **`quoteIdentifier()`** exported alongside the existing validators.
+
+### Not supported
+
+- **camelCase columns in `where()` / `select()` / `orderBy()`.** This release
+  covers case-sensitive *table* names — the FROM clause and join references.
+  Column references still go through `validateColumnName` and the schema
+  whitelist, neither of which accepts `"`, so a column created as `"hangXeId"`
+  remains unreachable. Name columns in snake_case, or alias them in the schema.
+
 ## [1.2.0] - 2026-08-13
 
 > Minor, not a patch: `exclude()` changes what it selects, and both `exclude()`

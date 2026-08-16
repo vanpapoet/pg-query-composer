@@ -44,6 +44,7 @@ const qc = createQueryComposer(userSchema, 'users', {
   extraColumns: ['custom_field'], // Additional whitelisted columns
   aliases: { email_addr: 'email' }, // Output aliases: SELECT emits `email AS email_addr`
   defaultColumns: ['id', 'inserted_at'], // Filterable without being in the schema
+  quoteTable: false, // true → FROM "users", preserving the table's letter case
 });
 
 console.log('Composer with options created');
@@ -278,6 +279,71 @@ createQueryComposer(schema, 'events', {
 The list **replaces** the defaults, it does not extend them. Entries in both
 `defaultColumns` and `extraColumns` are validated as plain column references at
 construction, since they reach SQL directly.
+
+### Case-Sensitive Table Names
+
+PostgreSQL folds unquoted identifiers to lower case before resolving them. A
+table created as `CREATE TABLE "settings_hangXe"` — the form most ORMs emit —
+is therefore unreachable through a bare reference: PG looks up
+`settings_hangxe` and reports `relation "settings_hangxe" does not exist`.
+
+Set `quoteTable: true` to emit the table double-quoted, preserving its case:
+
+```typescript
+import { createQueryComposer } from 'pg-query-composer';
+import { z } from 'zod';
+
+const schema = z.object({ id: z.number(), status: z.string() });
+
+const qc = createQueryComposer(schema, 'settings_hangXe', { quoteTable: true });
+console.log(qc.toParam().text);
+// → SELECT * FROM "settings_hangXe"
+
+// Schema-qualified names get each part quoted separately
+const qualified = createQueryComposer(schema, 'public.settings_hangXe', {
+  quoteTable: true,
+});
+console.log(qualified.toParam().text);
+// → SELECT * FROM "public"."settings_hangXe"
+```
+
+Off by default, and deliberately so: quoting unconditionally would break callers
+whose table really is lower-cased in PG and who rely on folding to reach it.
+
+The option never accepts a `"` from you — the name is validated as a plain
+identifier first, then the library adds its own quotes, so no quote-injection
+surface is created.
+
+#### Joining case-sensitive tables
+
+`quoteTable` covers the FROM clause only. An ON condition is an expression, not
+an identifier, so the library cannot quote it for you — write the quotes
+yourself. `join()`, `leftJoin()` and `rightJoin()` accept them in the table,
+the alias and the condition:
+
+```typescript
+const qc = createQueryComposer(schema, 'settings_hangXe', { quoteTable: true })
+  .join('"donHang"', '"settings_hangXe".id = "donHang"."hangXeId"');
+
+console.log(qc.toParam().text);
+// → SELECT * FROM "settings_hangXe"
+//   INNER JOIN "donHang" ON ("settings_hangXe".id = "donHang"."hangXeId")
+```
+
+Quoted and unquoted references mix freely, so only the case-sensitive parts need
+quoting: `'users.id = "donHang".user_id'`. `quoteIdentifier()` is exported if you
+would rather build the reference than hand-write the quotes.
+
+Only **complete, well-formed** quoted identifiers pass validation: a quote must
+open, wrap a plain identifier, and close. `"users"; DROP TABLE users --`,
+`"users; DROP TABLE users"`, `"a--b"`, `""` and a stray `users"` are all
+rejected — every character banned outside quotes stays banned inside them, so
+quoting can only ever narrow what gets through, never widen it.
+
+> Note: `validateIdentifier` guards *expressions*, not columns — it permits
+> spaces, parentheses and `=`, so a join reference like `users OR 1=1` has
+> always been accepted. Quoting does not change this either way. Never pass
+> user-controlled input as a table, alias or ON condition.
 
 ### Column Aliases
 

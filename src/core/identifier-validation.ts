@@ -3,9 +3,11 @@
  *
  * Allows: letters, digits, underscores, dots (schema.table),
  * parentheses/spaces (COUNT(*), table aliases), equals (JOIN ON),
- * commas (multi-column expressions).
- * Rejects: quotes, semicolons, comment markers (--), slashes, backslashes,
- * and other characters that could alter SQL structure.
+ * commas (multi-column expressions), and well-formed double-quoted identifiers
+ * ("tblFoo", for case-sensitive names PostgreSQL would otherwise fold).
+ * Rejects: single quotes, stray/unbalanced double quotes, semicolons,
+ * comment markers (--), slashes, backslashes, and other characters that could
+ * alter SQL structure.
  */
 
 // Safe SQL expression pattern — permits characters needed for:
@@ -14,17 +16,35 @@
 // Rejects: ', ", ;, --, /, \, and other injection vectors
 const SAFE_SQL_EXPR_RE = /^[a-zA-Z0-9_.*() =,]+$/;
 
+// A complete double-quoted identifier: an opening quote, a plain identifier,
+// a closing quote. Nothing else may appear between the quotes — no spaces,
+// no operators, no second quote — so a quoted segment can never carry SQL
+// structure of its own.
+const QUOTED_IDENT_RE = /"[a-zA-Z_][a-zA-Z0-9_]*"/g;
+
 /**
  * Validate that a string is a safe SQL identifier or expression.
  * Throws if the string contains potentially dangerous characters.
+ *
+ * Double-quoted identifiers are accepted so callers can reach tables and
+ * columns whose names PostgreSQL would otherwise fold to lower case
+ * (`ON "tblFoo".id = orders."userId"`). They are checked by substitution:
+ * every well-formed `"ident"` is replaced with a bare identifier, then the
+ * remainder must satisfy the unquoted rule. A quote that survives that pass is
+ * unbalanced or wraps something other than a plain identifier — either way it
+ * could break out of the quoting, so the whole string is rejected.
  *
  * @param identifier - The identifier or expression to validate
  * @throws Error if identifier contains unsafe characters
  */
 export function validateIdentifier(identifier: string): void {
-  if (!identifier || !SAFE_SQL_EXPR_RE.test(identifier)) {
+  // Substituting `q` (a valid bare identifier) keeps the remainder well-formed
+  // for SAFE_SQL_EXPR_RE without inventing characters the original lacked.
+  const unquoted = identifier ? identifier.replace(QUOTED_IDENT_RE, 'q') : identifier;
+
+  if (!identifier || unquoted.includes('"') || !SAFE_SQL_EXPR_RE.test(unquoted)) {
     throw new Error(
-      `Unsafe SQL identifier: "${identifier}". Only alphanumeric, underscore, dot, space, parentheses, asterisk, equals, and comma are allowed.`
+      `Unsafe SQL identifier: "${identifier}". Only alphanumeric, underscore, dot, space, parentheses, asterisk, equals, comma, and complete double-quoted identifiers are allowed.`
     );
   }
 }
@@ -51,6 +71,33 @@ export function validateColumnName(column: string): void {
       `Unsafe column name: "${column}". Expected a plain identifier such as "col" or "table.col".`
     );
   }
+}
+
+/**
+ * Wrap an identifier in double quotes, preserving its original letter case.
+ *
+ * PostgreSQL folds unquoted identifiers to lower case before resolving them, so
+ * a table created as `CREATE TABLE "settings_hangXe"` (what most ORMs emit) is
+ * unreachable through a bare `settings_hangXe` reference — PG looks up
+ * `settings_hangxe` and reports `relation "settings_hangxe" does not exist`.
+ *
+ * Each dot-separated part is quoted individually: `public.tblFoo` becomes
+ * `"public"."tblFoo"`, not `"public.tblFoo"` (which would name a single table
+ * containing a dot).
+ *
+ * The name is validated as a plain identifier first, so no `"` from the caller
+ * can ever reach the output — the quotes are ours, never theirs.
+ *
+ * @param name - Plain identifier, optionally qualified (`table`, `schema.table`)
+ * @returns The quoted form, e.g. `"settings_hangXe"`
+ * @throws Error if the name is not a plain (optionally qualified) identifier
+ */
+export function quoteIdentifier(name: string): string {
+  validateColumnName(name);
+  return name
+    .split('.')
+    .map((part) => `"${part}"`)
+    .join('.');
 }
 
 // Output aliases are single, unqualified identifiers — `col AS schema.alias` is

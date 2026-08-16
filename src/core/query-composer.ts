@@ -2,7 +2,7 @@ import * as z from 'zod';
 import { extractZodColumns } from '../utils/zod-utils';
 import { OPERATORS, VALID_OPERATORS_SET } from './operators';
 import { InvalidColumnError, InvalidOperatorError } from './errors';
-import { validateIdentifier, validateColumnName } from './identifier-validation';
+import { validateIdentifier, validateColumnName, quoteIdentifier } from './identifier-validation';
 import { isRawFilter } from './raw-filter';
 import { SelectBuilder, toPlaceholders } from './sql-builder';
 import { buildAliasMap, aliasProjection, aliasStarProjection, type AliasMap } from './column-aliases';
@@ -104,6 +104,7 @@ const DEFAULT_OPTIONS: Required<QueryBuilderOptions> = {
   extraColumns: [],
   aliases: {},
   defaultColumns: DEFAULT_FILTER_COLUMNS,
+  quoteTable: false,
 };
 
 /**
@@ -120,6 +121,9 @@ const DEFAULT_OPTIONS: Required<QueryBuilderOptions> = {
 export class QueryComposer {
   private schema: z.ZodTypeAny;
   private table: string;
+  // The table as it goes into FROM — quoted when `quoteTable` is set. Kept
+  // separate from `table` so clone() can re-derive it from the raw name.
+  private fromTable: string;
   private options: Required<QueryBuilderOptions>;
   private whitelist: readonly string[];
   private whitelistSet: ReadonlySet<string>;
@@ -155,7 +159,7 @@ export class QueryComposer {
     // Use pre-built defaults when no options provided (common path)
     if (!options || (options.strict === undefined && options.separator === undefined
         && !options.extraColumns?.length && !Object.keys(options.aliases ?? {}).length
-        && options.defaultColumns === undefined)) {
+        && options.defaultColumns === undefined && options.quoteTable === undefined)) {
       this.options = DEFAULT_OPTIONS;
     } else {
       this.options = {
@@ -165,8 +169,13 @@ export class QueryComposer {
         aliases: options.aliases ?? {},
         // Identity matters: buildWhitelist only caches the untouched default
         defaultColumns: options.defaultColumns ?? DEFAULT_FILTER_COLUMNS,
+        quoteTable: options.quoteTable ?? false,
       };
     }
+
+    // Quoting re-validates under the strict identifier rule — the looser
+    // validateIdentifier above admits expressions, which must never be quoted.
+    this.fromTable = this.options.quoteTable ? quoteIdentifier(table) : table;
 
     // Build whitelist from schema + extra + default columns (cached for common case)
     const wl = buildWhitelist(schema, this.options.extraColumns, this.options.defaultColumns);
@@ -675,7 +684,7 @@ export class QueryComposer {
    * Build SELECT query
    */
   toSelect(): SelectBuilder {
-    let query = new SelectBuilder().from(this.table);
+    let query = new SelectBuilder().from(this.fromTable);
 
     // Apply fields — use SELECT * when no explicit select/exclude (shorter SQL, faster PG parse)
     const aliases = this.aliasByColumn;
@@ -734,7 +743,7 @@ export class QueryComposer {
    * Build COUNT query
    */
   toCount(): SelectBuilder {
-    let query = new SelectBuilder().from(this.table).field('COUNT(*)', 'total');
+    let query = new SelectBuilder().from(this.fromTable).field('COUNT(*)', 'total');
 
     query = this.applyJoins(query);
     query = this.applyConditions(query);
